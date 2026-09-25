@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Опросы BCC-HUB</title>
+<meta name="description" content="Создание опросов с автоподбором вариантов, ссылкой и QR-кодом для участников.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700&display=swap">
+<style>
+:root{
+  --bg:#F3F4FA; --surface:#FFFFFF; --ink:#1B1B3A; --muted:#5C6086; --line:#DCDFEE;
+  --accent:#0A8C9E; --accent-ink:#FFFFFF; --accent-soft:#DDF4F7; --navy:#23235A;
+  --bar:#0FB5C9; --bar-track:#E8EAF4; --ok:#1F8A4C; --ok-soft:#E1F3E8; --warn:#9A6A00; --warn-soft:#FBF0D6;
+  --danger:#B3261E; --danger-soft:#FBE4E2;
+  --shadow:0 1px 2px rgba(27,27,58,.06),0 6px 24px rgba(27,27,58,.06);
+  --display:"Unbounded","Manrope",system-ui,sans-serif;
+  --body:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark;
+  --bg:#12122A; --surface:#1B1B3B; --ink:#ECEEFA; --muted:#A3A7CC; --line:#2F3060;
+  --accent:#3FD3E4; --accent-ink:#0E0E24; --accent-soft:#163C4A; --navy:#ECEEFA;
+  --bar:#3FD3E4; --bar-track:#2A2B55; --ok:#6FD39A; --ok-soft:#1B3A2B; --warn:#F0C45A; --warn-soft:#3A3018;
+  --danger:#FF8A80; --danger-soft:#3E1D1D; --shadow:none;
+}}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#12122A; --surface:#1B1B3B; --ink:#ECEEFA; --muted:#A3A7CC; --line:#2F3060;
+  --accent:#3FD3E4; --accent-ink:#0E0E24; --accent-soft:#163C4A; --navy:#ECEEFA;
+  --bar:#3FD3E4; --bar-track:#2A2B55; --ok:#6FD39A; --ok-soft:#1B3A2B; --warn:#F0C45A; --warn-soft:#3A3018;
+  --danger:#FF8A80; --danger-soft:#3E1D1D; --shadow:none;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--body);padding:0 16px 48px}
+.wrap{max-width:720px;margin:0 auto}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:18px;border-bottom:1px solid var(--line);margin-bottom:24px}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.02em;color:var(--navy)}
+.brand b{color:var(--accent);font-weight:700}
+.brand small{font-family:var(--body);font-weight:600;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.role{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1,h2,h3{text-wrap:balance;margin:0}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(22px,5vw,30px);line-height:1.2}
+h2{font-family:var(--display);font-weight:500;font-size:19px;line-height:1.3}
+h3{font-size:16px;font-weight:700}
+p{margin:0}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+.stack{display:flex;flex-direction:column;gap:16px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.between{justify-content:space-between}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:var(--shadow)}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+button,.btn{font:inherit;font-weight:700;font-size:15px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 16px;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.primary:hover{filter:brightness(1.07)}
+button.ghost{background:transparent;border-color:transparent;color:var(--accent);padding-inline:8px}
+button.danger{color:var(--danger)}
+button.danger.solid{background:var(--danger);border-color:var(--danger);color:#fff}
+button:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible,input:focus-visible,textarea:focus-visible,.opt:focus-within{outline:3px solid var(--accent);outline-offset:2px}
+label.f{display:flex;flex-direction:column;gap:6px;font-weight:700;font-size:14px}
+input[type=text],textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+textarea{resize:vertical;min-height:70px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.04em;padding:3px 10px;border-radius:999px;white-space:nowrap}
+.pill.draft{background:var(--warn-soft);color:var(--warn)}
+.pill.live{background:var(--ok-soft);color:var(--ok)}
+.pill.closed{background:var(--bar-track);color:var(--muted)}
+.pill.auto{background:var(--accent-soft);color:var(--accent)}
+.poll-item{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer;text-align:left;width:100%}
+.poll-item .meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.count{font-variant-numeric:tabular-nums;font-weight:800}
+.q-edit{border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;background:var(--surface)}
+.q-num{font-family:var(--display);font-weight:500;font-size:13px;color:var(--accent)}
+.opt-edit{display:flex;gap:8px;align-items:center}
+.opt-edit input{flex:1;min-width:0}
+.opt-edit button{min-width:44px;padding:0}
+.notice{border-radius:12px;padding:12px 14px;font-size:14px;background:var(--accent-soft);color:var(--ink)}
+.notice.err{background:var(--danger-soft);color:var(--danger)}
+.notice.ok{background:var(--ok-soft);color:var(--ok)}
+.linkbox{display:flex;gap:8px;flex-wrap:wrap}
+.linkbox input{flex:1 1 240px;font-size:14px}
+.qr-wrap{display:flex;flex-direction:column;align-items:center;gap:12px}
+.qr-wrap canvas{width:100%;max-width:360px;height:auto;border-radius:12px;background:#fff;image-rendering:pixelated}
+.big-num{font-family:var(--display);font-weight:700;font-size:44px;line-height:1;font-variant-numeric:tabular-nums;color:var(--navy)}
+.res-q{display:flex;flex-direction:column;gap:12px}
+.res-opt{display:flex;flex-direction:column;gap:6px}
+.res-opt .lbl{display:flex;justify-content:space-between;gap:12px;font-size:15px}
+.res-opt .lbl span:last-child{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+.track{height:10px;border-radius:6px;background:var(--bar-track);overflow:hidden}
+.fill{height:100%;background:var(--bar);border-radius:6px;transition:width .4s ease}
+.form-q{display:flex;flex-direction:column;gap:10px}
+.opt{display:flex;align-items:center;gap:12px;border:1.5px solid var(--line);border-radius:12px;padding:14px;cursor:pointer;min-height:52px;background:var(--surface)}
+.opt input{width:20px;height:20px;accent-color:var(--accent);margin:0;flex:none}
+.opt:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.overlay{position:fixed;inset:0;background:#fff;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.overlay canvas{width:min(88vw,74vh);height:auto;image-rendering:pixelated}
+.overlay .ov-title{font-family:"Unbounded",system-ui,sans-serif;font-weight:700;color:#1B1B3A;font-size:clamp(18px,3.4vw,36px);text-align:center;max-width:90vw}
+.overlay .ov-hint{color:#5C6086;font-size:clamp(14px,1.8vw,20px)}
+.overlay button{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:12px;background:#fff;color:#1B1B3A;border-color:#DCDFEE}
+.confirm{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px;border-radius:10px;background:var(--danger-soft)}
+.spin{width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.fill{transition:none}.spin{animation-duration:2.4s}}
+.center{text-align:center}
+body{margin:0;padding-top:env(safe-area-inset-top,0px)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span>BCC-<b>HUB</b></span><small>Опросы</small></div>
+    <span class="role" id="role"></span>
+  </header>
+  <main id="app"><p class="muted">Загрузка…</p></main>
+</div>
+<div class="overlay" id="overlay" hidden>
+  <button id="ovClose" type="button">Закрыть</button>
+  <div class="ov-title" id="ovTitle"></div>
+  <canvas id="ovCanvas" width="1200" height="1200"></canvas>
+  <div class="ov-hint">Наведите камеру телефона на QR-код</div>
+</div>
+<script src="config.js"></script>
+<script src="qrcode.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
