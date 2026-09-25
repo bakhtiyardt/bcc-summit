@@ -58,11 +58,13 @@
     doc.text(meta.client ? "Заявка на лизинг" : "Предварительный расчёт лизинга", M, 36);
     let shift = 0;
     if (meta.client) {  // блок с контактами клиента для менеджера
-      doc.setFillColor(...FIELD); doc.roundedRect(M, 41, CW, 12, 2, 2, "F");
+      const two = !!meta.client.bin;
+      doc.setFillColor(...FIELD); doc.roundedRect(M, 41, CW, two ? 17 : 12, 2, 2, "F");
       doc.setFont("Inter", "normal"); doc.setFontSize(8.5); doc.setTextColor(...MUTED); doc.text("Клиент", M + 4, 46);
       doc.setFont("Inter", "bold"); doc.setFontSize(11); doc.setTextColor(...INK);
       doc.text([meta.client.name, meta.client.phone, meta.client.email].filter(Boolean).join(" · "), M + 4, 50.8);
-      shift = 16;
+      if (two) { doc.setFont("Inter", "normal"); doc.setFontSize(10); doc.text(`${meta.client.type} · ${meta.client.idLabel} ${meta.client.bin}`, M + 4, 55.6); }
+      shift = two ? 21 : 16;
     }
 
     // Параметры сделки: две колонки «подпись — значение»

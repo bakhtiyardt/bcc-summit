@@ -10,7 +10,7 @@
     pending: null, msgs: [], busy: false,
     ai: CFG.aiUrl ? "unknown" : "off",
     result: null, explain: null,
-    lead: null, leadName: "", leadEmail: "", leadPhone: "", leadConsent: false, leadErr: null   // lead: null | "form" | "sending" | {name, phone, email}
+    lead: null, leadType: "ИП", leadBin: "", leadName: "", leadEmail: "", leadPhone: "", leadConsent: false, leadErr: null   // lead: null | "form" | "sending" | {name, phone, email}
   };
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -29,7 +29,9 @@
   ];
   const QUESTIONS = {
     cost: "Какова стоимость предмета лизинга? Например: 10 млн тенге.",
-    down: `Какой аванс вы готовы внести? Можно процентом (20%) или суммой (2 млн). Минимум ${CFG.minDownPct}% от стоимости.`,
+    down: CFG.minDownPct > 0
+      ? `Какой аванс вы готовы внести? Можно процентом (20%) или суммой (2 млн). Минимум ${CFG.minDownPct}% от стоимости.`
+      : "Какой аванс вы готовы внести? Можно процентом (20%), суммой (2 млн) или «без аванса».",
     months: `На какой срок нужен лизинг? От ${CFG.minTermMonths} до ${CFG.maxTermMonths} месяцев.`,
   };
 
@@ -67,7 +69,7 @@
   function describeParams(){
     const parts = [];
     if (S.cost != null) parts.push(`стоимость ${money(S.cost)}`);
-    if (S.down != null) parts.push(S.down.type === "pct" ? `аванс ${pctStr(S.down.value)}` : `аванс ${money(S.down.value)}`);
+    if (S.down != null) parts.push(S.down.value === 0 ? "без аванса" : S.down.type === "pct" ? `аванс ${pctStr(S.down.value)}` : `аванс ${money(S.down.value)}`);
     if (S.months != null) parts.push(`срок ${monthsStr(S.months)}`);
     return parts.join(", ");
   }
@@ -116,7 +118,7 @@
   function renderCtx(){
     const items = [];
     if (S.cost != null) items.push(money(S.cost));
-    if (S.down != null) items.push("аванс " + (S.down.type === "pct" ? pctStr(S.down.value) : money(S.down.value)));
+    if (S.down != null) items.push(S.down.value === 0 ? "без аванса" : "аванс " + (S.down.type === "pct" ? pctStr(S.down.value) : money(S.down.value)));
     if (S.months != null) items.push(monthsStr(S.months));
     $("ctx").innerHTML = items.map(i => `<span>${esc(i)}</span>`).join("");
     $("ctx").hidden = !items.length;
@@ -216,7 +218,7 @@
       <div>
         <div class="pair">
           <div class="field"><div class="col"><label for="pDown">Первоначальный взнос</label>
-            <input type="text" id="pDown" inputmode="numeric" placeholder="${S.cost != null ? plain(S.cost * CFG.minDownPct / 100) + " и больше" : "Сумма"}" value="${d != null ? plain(d) : ""}"></div><span class="suffix">₸</span></div>
+            <input type="text" id="pDown" inputmode="numeric" placeholder="${S.cost != null && CFG.minDownPct > 0 ? plain(S.cost * CFG.minDownPct / 100) + " и больше" : "Сумма, можно 0"}" value="${d != null ? plain(d) : ""}"></div><span class="suffix">₸</span></div>
           <div class="field"><div class="col"><label for="pPct">Аванс</label>
             <input type="text" id="pPct" inputmode="decimal" placeholder="от ${CFG.minDownPct}" value="${p != null ? Math.round(p * 100) / 100 : ""}"></div><span class="suffix">%</span></div>
         </div>
@@ -301,6 +303,15 @@
   const phonePretty = d => d.length === 11 ? `+${d[0]} ${d.slice(1, 4)} ${d.slice(4, 7)} ${d.slice(7, 9)} ${d.slice(9)}` : d;
 
   const emailOk = s => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s);
+  // ИИН/БИН Казахстана: 12 цифр, последняя — контрольная (два прохода весов по модулю 11).
+  function kzIdOk(id){
+    if (!/^\d{12}$/.test(id)) return false;
+    const d = [...id].map(Number);
+    let c = d.slice(0, 11).reduce((s, x, i) => s + x * (i + 1), 0) % 11;
+    if (c === 10) c = d.slice(0, 11).reduce((s, x, i) => s + x * ((i + 2) % 11 + 1), 0) % 11;
+    return c !== 10 && c === d[11];
+  }
+  const idLabel = () => S.leadType === "ТОО" ? "БИН" : "ИИН";
 
   function leadMarkup(r){
     if (!S.lead) return "";
@@ -316,7 +327,12 @@
       <form class="lead-box stack" id="leadForm" novalidate style="gap:10px">
         <h3>Заявка менеджеру</h3>
         <p class="muted small">Менеджер получит расчёт с графиком платежей и свяжется с вами.</p>
-        <div class="field"><div class="col"><label for="leadName">Имя</label>
+        <div class="seg" role="radiogroup" aria-label="Клиент">
+          ${["ИП", "ТОО"].map(t => `<button type="button" role="radio" aria-checked="${S.leadType === t}" class="${S.leadType === t ? "on" : ""}" data-type="${t}">${t}</button>`).join("")}
+        </div>
+        <div class="field"><div class="col"><label for="leadBin">${idLabel()} ${S.leadType === "ТОО" ? "компании" : "индивидуального предпринимателя"}</label>
+          <input type="text" id="leadBin" inputmode="numeric" autocomplete="off" maxlength="24" placeholder="12 цифр" value="${esc(S.leadBin)}"></div></div>
+        <div class="field"><div class="col"><label for="leadName">${S.leadType === "ТОО" ? "Контактное лицо" : "Имя"}</label>
           <input type="text" id="leadName" autocomplete="name" maxlength="80" placeholder="Как к вам обращаться" value="${esc(S.leadName)}"></div></div>
         <div class="pair" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
           <div class="field"><div class="col"><label for="leadEmail">E-mail</label>
@@ -336,6 +352,11 @@
     if (pdfBtn) pdfBtn.onclick = () => window.LeasePdf.download(r, {explain: S.explain.text, url: location.href}).catch(() => {});
     const form = $("leadForm");
     if (!form) return;
+    form.querySelectorAll("[data-type]").forEach(b => b.onclick = () => { S.leadType = b.dataset.type; renderResult(); });
+    $("leadBin").oninput = e => {
+      e.target.value = e.target.value.replace(/\D/g, "").slice(0, 12); S.leadBin = e.target.value;
+      if (S.leadErr && S.leadErr.includes(idLabel()) && kzIdOk(S.leadBin)) { S.leadErr = null; form.querySelector(".err")?.remove(); }
+    };
     $("leadName").oninput = e => { S.leadName = e.target.value; };
     $("leadEmail").oninput = e => { S.leadEmail = e.target.value; };
     $("leadPhone").oninput = e => { S.leadPhone = e.target.value; };
@@ -346,8 +367,10 @@
     };
     form.onsubmit = async e => {
       e.preventDefault();
-      const name = S.leadName.trim(), email = S.leadEmail.trim(), d = phoneDigits(S.leadPhone);
-      S.leadErr = name.length < 2 ? "Укажите имя."
+      const name = S.leadName.trim(), email = S.leadEmail.trim(), d = phoneDigits(S.leadPhone), bin = S.leadBin.trim();
+      S.leadErr = !/^\d{12}$/.test(bin) ? `Укажите ${idLabel()}: 12 цифр.`
+        : !kzIdOk(bin) ? `${idLabel()} указан с ошибкой: проверьте цифры.`
+        : name.length < 2 ? "Укажите имя."
         : !emailOk(email) ? "Укажите e-mail, например name@company.kz."
         : !(d.length === 11 && d[0] === "7") ? "Укажите телефон в формате +7 7XX XXX XX XX."
         : !S.leadConsent ? "Чтобы отправить заявку, подтвердите согласие на обработку персональных данных."
@@ -356,11 +379,11 @@
       const phone = phonePretty(d), consentAt = new Date().toISOString();
       S.lead = "sending"; renderResult();
       try {
-        const pdf = await window.LeasePdf.asBase64(r, {explain: S.explain.text, url: location.href, client: {name, phone, email}});
+        const pdf = await window.LeasePdf.asBase64(r, {explain: S.explain.text, url: location.href, client: {name, phone, email, type: S.leadType, idLabel: idLabel(), bin}});
         const res = await fetch(CFG.aiUrl, {
           method: "POST",
           headers: {"Content-Type": "application/json", apikey: CFG.supabaseKey},
-          body: JSON.stringify({action: "lead", name, email, phone, consent: true, consentAt, url: location.href, filename: pdf.filename, pdfBase64: pdf.base64,
+          body: JSON.stringify({action: "lead", clientType: S.leadType, bin, name, email, phone, consent: true, consentAt, url: location.href, filename: pdf.filename, pdfBase64: pdf.base64,
             summary: {cost: money(r.cost), down: `${money(r.down)} (${pctStr(r.downPct)})`, months: monthsStr(r.months),
               payment: money(r.payment), overpayment: money(r.overpayment), rate: `${r.rate}% годовых`}})
         });

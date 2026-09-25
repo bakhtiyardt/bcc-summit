@@ -91,6 +91,9 @@ async function sendLead(b: Record<string, unknown>) {
   const s = (b.summary ?? {}) as Record<string, unknown>;
   if (name.length < 2 || digits.length < 10 || digits.length > 15 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return json({ error: "bad_contact" }, 400);
   if (b.consent !== true) return json({ error: "no_consent" }, 400);
+  const clientType = b.clientType === "ТОО" ? "ТОО" : b.clientType === "ИП" ? "ИП" : "";
+  const bin = String(b.bin ?? "");
+  if (!clientType || !/^\d{12}$/.test(bin)) return json({ error: "bad_bin" }, 400);
   const t = Date.parse(String(b.consentAt ?? ""));
   const consentAt = isNaN(t) ? new Date() : new Date(t);
   if (!/^[A-Za-z0-9+/=]+$/.test(pdf) || pdf.length > 2_000_000) return json({ error: "bad_pdf" }, 400);
@@ -98,7 +101,8 @@ async function sendLead(b: Record<string, unknown>) {
   if (!key || !to) return json({ error: "mail_not_configured" }, 500);
 
   const rows = [
-    ["Клиент", name], ["Телефон", phone], ["E-mail", email],
+    ["Клиент", `${clientType} · ${clientType === "ТОО" ? "БИН" : "ИИН"} ${bin}`],
+    [clientType === "ТОО" ? "Контактное лицо" : "Имя", name], ["Телефон", phone], ["E-mail", email],
     ["Стоимость предмета лизинга", s.cost], ["Первоначальный взнос", s.down], ["Срок", s.months],
     ["Ежемесячный платёж", s.payment], ["Переплата", s.overpayment], ["Ставка удорожания", s.rate],
     ["Согласие на обработку ПД", `получено ${consentAt.toLocaleString("ru-RU", { timeZone: "Asia/Almaty" })} (Алматы)`],
@@ -117,7 +121,7 @@ async function sendLead(b: Record<string, unknown>) {
       from: "BCC Leasing <onboarding@resend.dev>",
       to: [to],
       reply_to: email,
-      subject: `Заявка на лизинг: ${name}, ${s.payment ?? ""} в месяц`,
+      subject: `Заявка на лизинг: ${clientType} ${name}, ${s.payment ?? ""} в месяц`,
       html,
       attachments: [{ filename: String(b.filename ?? "raschet.pdf").replace(/[^\w.\-]/g, "_"), content: pdf }],
     }),
