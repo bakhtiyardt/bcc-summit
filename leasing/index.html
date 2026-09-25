@@ -151,14 +151,10 @@ tfoot td{font-weight:800;background:var(--field);position:sticky;bottom:0}
 .site-foot .flogo{display:flex;align-items:center;gap:7px;font-size:clamp(30px,5vw,40px);letter-spacing:-.03em;color:var(--ink);line-height:1}
 .site-foot .flogo b{font-weight:800}
 .site-foot .flogo span{font-weight:400}
-.site-foot .contacts{display:grid;grid-template-columns:fit-content(200px) minmax(0,max-content);column-gap:clamp(18px,5vw,56px);row-gap:16px;padding-bottom:18px;border-bottom:1px solid var(--line)}
-@media (max-width:420px){.site-foot .contacts a{font-size:17px}}
+.site-foot .contacts{display:flex;flex-direction:column;gap:16px;padding-bottom:22px;border-bottom:1px solid var(--line)}
 .site-foot .contacts a{display:block;color:var(--accent);font-size:clamp(18px,2.4vw,22px);font-weight:800;text-decoration:none}
 .site-foot .contacts span{display:block;color:var(--muted);font-size:14px}
-.site-foot nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 24px;padding-bottom:26px;border-bottom:1px solid var(--line)}
-@media (min-width:900px){.site-foot nav{grid-template-columns:repeat(4,minmax(0,1fr))}}
-.site-foot nav a{color:var(--ink);text-decoration:none;font-size:16px}
-.site-foot nav a:hover,.site-foot .contacts a:hover{text-decoration:underline}
+.site-foot .contacts a:hover{text-decoration:underline}
 .site-foot .legal{color:var(--muted);font-size:13px;display:flex;flex-direction:column;gap:10px;max-width:70ch}
 @media (prefers-reduced-motion:reduce){.typing i{animation:none}}
 </style>
@@ -217,25 +213,15 @@ tfoot td{font-weight:800;background:var(--field);position:sticky;bottom:0}
       <div><a href="mailto:info@bccleasing.kz">info@bccleasing.kz</a><span>Для вопросов и предложений</span></div>
       <div><a href="tel:605">605</a><span>Для бизнес-клиентов</span></div>
     </div>
-    <nav aria-label="Разделы сайта BCC Leasing">
-      <a href="https://bccleasing.kz/" target="_blank" rel="noopener">Leasing Day</a>
-      <a href="https://bccleasing.kz/" target="_blank" rel="noopener">Спецпредложения</a>
-      <a href="https://bccleasing.kz/" target="_blank" rel="noopener">Сервис</a>
-      <a href="https://bccleasing.kz/" target="_blank" rel="noopener">Стать партнером</a>
-      <a href="https://bccleasing.kz/" target="_blank" rel="noopener">О компании</a>
-      <a href="https://bccleasing.kz/" target="_blank" rel="noopener">Контакты</a>
-      <a href="https://bccleasing.kz/" target="_blank" rel="noopener">Политика конфиденциальности</a>
-      <a href="https://bccleasing.kz/" target="_blank" rel="noopener">Карта сайта</a>
-    </nav>
     <div class="legal">
       <p style="margin:0">© 2000–2026 АО «Банк ЦентрКредит»<br>Все права защищены.</p>
       <p style="margin:0">Лицензия на проведение банковских и иных операций и деятельности на рынке ценных бумаг №1.2.25/195/34 от 03.02.2020, выданная Агентством РК по регулированию и развитию финансового рынка.</p>
     </div>
   </footer>
 </div>
-<script src="config.js?v=13"></script>
-<script src="calc.js?v=13"></script>
-<script src="pdf.js?v=13"></script>
-<script src="app.js?v=13"></script>
+<script src="config.js?v=14"></script>
+<script src="calc.js?v=14"></script>
+<script src="pdf.js?v=14"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>
