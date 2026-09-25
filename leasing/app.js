@@ -325,7 +325,7 @@
             <input type="tel" id="leadPhone" autocomplete="tel" inputmode="tel" maxlength="20" placeholder="+7 7XX XXX XX XX" value="${esc(S.leadPhone)}"></div></div>
         </div>
         <label class="consent"><input type="checkbox" id="leadConsent" ${S.leadConsent ? "checked" : ""}>
-          <span>Я даю согласие на сбор и обработку моих персональных данных. <button type="button" class="linklike" id="consentMore">Подробнее</button></span></label>
+          <span>Я даю <a class="linklike" href="consent.html" target="_blank" rel="noopener">согласие на сбор и обработку персональных данных</a></span></label>
         ${S.leadErr ? `<div class="err">${esc(S.leadErr)}</div>` : ""}
         <button type="submit" class="primary" ${sending ? "disabled" : ""}>${sending ? "Отправляю заявку…" : "Отправить заявку"}</button>
       </form>`;
@@ -344,7 +344,6 @@
       S.leadConsent = e.target.checked;
       if (S.leadConsent && S.leadErr && S.leadErr.includes("согласие")) { S.leadErr = null; form.querySelector(".err")?.remove(); }
     };
-    $("consentMore").onclick = () => $("consentDialog").showModal();
     form.onsubmit = async e => {
       e.preventDefault();
       const name = S.leadName.trim(), email = S.leadEmail.trim(), d = phoneDigits(S.leadPhone);
