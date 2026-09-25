@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Калькулятор лизинга BCC Leasing</title>
+<meta name="description" content="Предварительный расчёт платежей по лизингу: опишите сделку своими словами и получите график.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>
+:root{
+  --bg:#F3F4F6; --surface:#FFFFFF; --field:#EDEFF2; --ink:#1E232C; --muted:#6B7280; --line:#E2E5EA;
+  --accent:#2356D9; --accent-ink:#FFFFFF; --accent-soft:#E7EEFD; --accent-2:#5C86F2;
+  --bubble-bot:#F1F2F5; --warn:#8A5A00; --warn-soft:#FBF1DA; --danger:#B3261E; --danger-soft:#FBE4E2; --ok:#1E7B4E; --ok-soft:#E1F3E8;
+  --shadow:0 1px 2px rgba(30,35,44,.04),0 10px 30px rgba(30,35,44,.06);
+  --font:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark;
+  --bg:#0E1117; --surface:#161A22; --field:#1E2330; --ink:#E8EBF1; --muted:#9AA3B2; --line:#262C38;
+  --accent:#5B84F0; --accent-ink:#FFFFFF; --accent-soft:#1B2745; --accent-2:#86A6F6;
+  --bubble-bot:#1E2330; --warn:#F0C45A; --warn-soft:#3A3018; --danger:#FF8A80; --danger-soft:#3E1D1D; --ok:#6FD39A; --ok-soft:#1B3A2B; --shadow:none;
+}}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1117; --surface:#161A22; --field:#1E2330; --ink:#E8EBF1; --muted:#9AA3B2; --line:#262C38;
+  --accent:#5B84F0; --accent-ink:#FFFFFF; --accent-soft:#1B2745; --accent-2:#86A6F6;
+  --bubble-bot:#1E2330; --warn:#F0C45A; --warn-soft:#3A3018; --danger:#FF8A80; --danger-soft:#3E1D1D; --ok:#6FD39A; --ok-soft:#1B3A2B; --shadow:none;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--font);padding:0 16px 48px;overflow-x:hidden}
+.wrap{max-width:1180px;margin:0 auto;position:relative}
+h1,h2,h3{margin:0;text-wrap:balance}
+p{margin:0}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+/* шапка */
+.topbar{position:relative;z-index:2;margin-top:calc(16px + env(safe-area-inset-top,0px));background:color-mix(in srgb,var(--surface) 80%,transparent);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:16px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:1000px}
+.brand{display:flex;align-items:center;gap:14px;min-width:0}
+.logo{display:flex;align-items:center;gap:5px;font-size:21px;letter-spacing:-.02em;color:var(--ink);white-space:nowrap}
+.logo b{font-weight:800}
+.logo span{font-weight:400;color:var(--muted)}
+.brand .sep{width:1px;height:22px;background:var(--line)}
+.brand .sub{font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tools{display:flex;align-items:center;gap:8px}
+.badge{font-size:12px;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:3px 10px}
+.icon-btn{width:38px;height:38px;min-height:38px;padding:0;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:inline-grid;place-items:center;cursor:pointer}
+@media (max-width:560px){.brand .sep,.brand .sub{display:none}}
+/* герой */
+.hero{position:relative;padding:56px 0 40px;min-height:300px}
+.crumbs{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px}
+.hero h1{font-size:clamp(28px,4.6vw,40px);line-height:1.1;font-weight:800;letter-spacing:-.02em}
+.hero p.lead{margin-top:8px;font-size:17px;color:var(--muted);max-width:30em}
+.hero .cta{margin-top:22px}
+.diamond{position:absolute;right:-40px;top:-120px;width:440px;height:440px;pointer-events:none;z-index:0}
+.diamond::before,.diamond::after{content:"";position:absolute;inset:0;border-radius:90px;transform:rotate(45deg)}
+.diamond::before{background:linear-gradient(135deg,var(--accent) 0%,var(--accent-2) 55%,transparent 80%);opacity:.95}
+.diamond::after{inset:46px;background:var(--bg)}
+.diamond .in{position:absolute;inset:0;display:grid;place-items:center;z-index:1;text-align:center}
+.diamond .in small{display:block;font-size:13px;color:var(--muted);font-weight:600}
+.diamond .in strong{display:block;font-size:30px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.hero > *:not(.diamond){position:relative;z-index:1}
+@media (max-width:900px){.diamond{display:none}.hero{padding:32px 0 24px;min-height:0}}
+/* основная сетка */
+.grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
+.pad{padding:22px}
+.stack{display:flex;flex-direction:column;gap:14px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.between{justify-content:space-between}
+h2{font-size:18px;font-weight:800}
+/* поля */
+.field{background:var(--field);border-radius:12px;padding:8px 14px 8px;display:flex;align-items:center;gap:8px;border:1px solid transparent}
+.field:focus-within{border-color:var(--accent)}
+.field .col{flex:1;min-width:0}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--muted)}
+.field input{font:inherit;font-size:17px;font-weight:600;color:var(--ink);background:transparent;border:0;outline:0;padding:0;width:100%;font-variant-numeric:tabular-nums}
+.field input::placeholder{color:var(--muted);font-weight:500;opacity:.7}
+.field .suffix{font-weight:700;color:var(--muted)}
+.field select{font:inherit;font-weight:700;color:var(--ink);background:transparent;border:0;outline:0;cursor:pointer}
+.hint{font-size:12px;color:var(--muted);margin-top:6px}
+.range{margin-top:10px}
+input[type=range]{width:100%;accent-color:var(--accent);margin:0}
+.range .ends{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pair{display:grid;grid-template-columns:minmax(0,1fr) 112px;gap:8px}
+.err{background:var(--danger-soft);color:var(--danger);border-radius:10px;padding:10px 14px;font-size:14px}
+/* чат */
+.chat{display:flex;flex-direction:column}
+.chat-head{display:flex;align-items:flex-start;gap:12px;padding:18px 20px 10px}
+.chat-ico{width:40px;height:40px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;flex:none}
+.chat-head h2{font-size:17px}
+.ctx{display:flex;flex-wrap:wrap;gap:6px;padding:0 20px 10px}
+.ctx span{font-size:12px;font-weight:700;background:var(--field);border-radius:8px;padding:3px 8px;font-variant-numeric:tabular-nums}
+.msgs{display:flex;flex-direction:column;gap:10px;padding:10px 20px;overflow-y:auto;height:360px;border-top:1px solid var(--line)}
+.msg{max-width:86%;padding:10px 14px;border-radius:14px;white-space:pre-line;font-size:14px}
+.msg.bot{background:var(--bubble-bot);align-self:flex-start;border-top-left-radius:4px}
+.msg.me{background:var(--accent);color:var(--accent-ink);align-self:flex-end;border-top-right-radius:4px;font-weight:600}
+.msg.bad{background:var(--danger-soft);color:var(--danger)}
+.msg .src{display:block;font-size:11px;opacity:.7;margin-top:4px;font-weight:600}
+.typing{display:inline-flex;gap:4px}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:b 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes b{0%,60%,100%{opacity:.3}30%{opacity:1}}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:10px 20px 4px}
+.chip{flex:none;font:inherit;font-size:12px;font-weight:600;min-height:32px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 12px;cursor:pointer}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.composer{display:flex;gap:8px;padding:10px 20px 18px}
+.composer input{flex:1;min-width:0;font:inherit;font-size:16px;color:var(--ink);background:var(--field);border:1px solid transparent;border-radius:12px;padding:11px 14px;outline:0}
+.composer input:focus{border-color:var(--accent)}
+button{font:inherit;font-weight:700;font-size:14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 16px;min-height:44px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.primary:hover{filter:brightness(1.08)}
+button.ghost{background:transparent;border-color:transparent;color:var(--accent);padding-inline:8px}
+button:disabled{opacity:.5;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;margin-left:auto}
+.pill.ai{background:var(--ok-soft);color:var(--ok)}
+.pill.rules{background:var(--warn-soft);color:var(--warn)}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+/* результат */
+.results{margin-top:20px}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:640px){.kpis{grid-template-columns:1fr}}
+.kpi{border-radius:14px;padding:16px;background:var(--field)}
+.kpi.main{background:var(--accent);color:var(--accent-ink)}
+.kpi .lbl{font-size:13px;font-weight:600;opacity:.8}
+.kpi .val{font-size:clamp(22px,3vw,28px);font-weight:800;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.2}
+.explain{border-left:3px solid var(--accent);padding:2px 0 2px 14px;max-width:70ch}
+.disclaimer{background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:10px 14px;font-size:14px;font-weight:700}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px;max-height:440px}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{padding:9px 14px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+thead th{position:sticky;top:0;background:var(--surface);font-weight:700;color:var(--muted);font-size:12px}
+tfoot td{font-weight:800;background:var(--field);position:sticky;bottom:0}
+.lead-box{border:2px solid var(--accent);border-radius:14px;padding:16px}
+.empty{padding:26px 22px}
+@media (prefers-reduced-motion:reduce){.typing i{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-label="bcc leasing"><b>bcc</b>
+        <svg width="20" height="18" viewBox="0 0 20 18" aria-hidden="true"><path d="M10 2.2 18 16H2z" fill="none" stroke="var(--accent)" stroke-width="2.6" stroke-linejoin="round"/></svg>
+        <span>leasing</span></span>
+      <span class="sep"></span><span class="sub">Лизинг для бизнеса</span>
+    </div>
+    <div class="tools">
+      <span class="badge">Демо</span>
+      <button type="button" class="icon-btn" id="themeBtn" aria-label="Сменить тему" title="Сменить тему">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <button type="button" class="icon-btn" id="fsBtn" aria-label="Во весь экран" title="Во весь экран">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="diamond" aria-hidden="true"><div class="in"><div><small>Ежемесячный платёж</small><strong id="heroPay">—</strong></div></div></div>
+    <div class="crumbs">Лизинг · Калькулятор</div>
+    <h1>Калькулятор лизинга</h1>
+    <p class="lead">Опишите сделку своими словами. ИИ-помощник распознает стоимость, аванс и срок и за пару секунд покажет платёж и график.</p>
+    <div class="cta"><button type="button" class="primary" id="focusChat">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>
+      Спросить помощника</button></div>
+  </section>
+
+  <div class="grid">
+    <section class="card pad stack" id="params" aria-label="Параметры лизинга"></section>
+    <section class="card chat" aria-label="ИИ-помощник">
+      <div class="chat-head">
+        <span class="chat-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+        <div><h2>ИИ-помощник</h2><p class="muted small">Посчитаю платёж по вашему описанию</p></div>
+        <span id="aiStatus" class="pill rules"><span class="dot"></span>ИИ + правила</span>
+      </div>
+      <div class="ctx" id="ctx"></div>
+      <div class="msgs" id="msgs" aria-live="polite"></div>
+      <div class="chips" id="chips"></div>
+      <form class="composer" id="composer" autocomplete="off">
+        <input type="text" id="input" maxlength="500" placeholder="Например: авто за 15 млн, аванс 20%, на 2 года" aria-label="Сообщение помощнику">
+        <button type="submit" class="primary" id="send">Отправить</button>
+      </form>
+    </section>
+  </div>
+
+  <section class="results stack" id="result" aria-live="polite"></section>
+</div>
+<script src="config.js?v=2"></script>
+<script src="calc.js?v=2"></script>
+<script src="app.js?v=2"></script>
+</body>
+</html>

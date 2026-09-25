@@ -1,0 +1,342 @@
+// Калькулятор лизинга BCC Leasing (демо): чат и форма → параметры → расчёт по формуле → график.
+(function () {
+  "use strict";
+  const CFG = window.LEASE_CONFIG;
+  const { annuity, parseDeal } = window.LeaseCalc;
+  const COST_MIN = 1e6, COST_MAX = 300e6;
+
+  const S = {
+    cost: null, down: null, months: null,   // down: {type: "pct" | "amt", value}
+    pending: null, msgs: [], busy: false,
+    ai: CFG.aiUrl ? "unknown" : "off",
+    result: null, explain: null, lead: false
+  };
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const plain = n => Math.round(n).toLocaleString("ru-RU");
+  const money = n => plain(n) + " ₸";
+  const pctStr = n => (Math.round(n * 100) / 100).toLocaleString("ru-RU") + "%";
+  const plural = (n, one, few, many) => { const a = n % 10, b = n % 100; return a === 1 && b !== 11 ? one : a >= 2 && a <= 4 && (b < 10 || b >= 20) ? few : many; };
+  const monthsStr = n => `${n} ${plural(n, "месяц", "месяца", "месяцев")}`;
+  const digits = s => { const v = parseFloat(String(s).replace(/[^\d.,]/g, "").replace(",", ".")); return isFinite(v) ? v : null; };
+
+  const EXAMPLES = [
+    "Оборудование за 10 млн тенге, аванс 20%, на 24 месяца",
+    "Спецтехника 45 000 000, первоначальный взнос 9 млн, срок 3 года",
+    "Автомобиль 18,5 млн на 5 лет, аванс 15%",
+    "Экскаватор за 25 млн",
+  ];
+  const QUESTIONS = {
+    cost: "Какова стоимость предмета лизинга? Например: 10 млн тенге.",
+    down: `Какой аванс вы готовы внести? Можно процентом (20%) или суммой (2 млн). Минимум ${CFG.minDownPct}% от стоимости.`,
+    months: `На какой срок нужен лизинг? От ${CFG.minTermMonths} до ${CFG.maxTermMonths} месяцев.`,
+  };
+
+  // ---------- ИИ (Supabase Edge Function) ----------
+  async function ai(action, payload) {
+    if (S.ai === "off") return null;
+    const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 9000);
+    try {
+      const res = await fetch(CFG.aiUrl, {
+        method: "POST", signal: ctrl.signal,
+        headers: {"Content-Type": "application/json", apikey: CFG.supabaseKey},
+        body: JSON.stringify({action, ...payload})
+      });
+      if (!res.ok) throw new Error("http_" + res.status);
+      const data = await res.json();
+      setAi("on");
+      return data;
+    } catch {
+      setAi("off");
+      return null;
+    } finally { clearTimeout(timer); }
+  }
+  function setAi(state){
+    S.ai = state;
+    const el = $("aiStatus");
+    el.className = "pill " + (state === "on" ? "ai" : "rules");
+    el.innerHTML = `<span class="dot"></span>${state === "on" ? "ИИ подключён" : state === "off" ? "Режим правил" : "ИИ + правила"}`;
+    el.title = state === "off" ? "ИИ недоступен: параметры распознаются правилами" : "";
+  }
+
+  // ---------- состояние ----------
+  function downAmount(){ return S.down == null || S.cost == null ? null : S.down.type === "pct" ? S.cost * S.down.value / 100 : S.down.value; }
+  function downPct(){ const d = downAmount(); return d == null ? null : d / S.cost * 100; }
+  const complete = () => S.cost != null && S.down != null && S.months != null;
+  function describeParams(){
+    const parts = [];
+    if (S.cost != null) parts.push(`стоимость ${money(S.cost)}`);
+    if (S.down != null) parts.push(S.down.type === "pct" ? `аванс ${pctStr(S.down.value)}` : `аванс ${money(S.down.value)}`);
+    if (S.months != null) parts.push(`срок ${monthsStr(S.months)}`);
+    return parts.join(", ");
+  }
+
+  // Правила блока E: ошибка ввода → сообщение и повторный вопрос по этому полю.
+  function validate(){
+    if (S.cost != null && !(S.cost > 0)) return {field: "cost", text: "Стоимость должна быть больше нуля."};
+    if (S.months != null && S.months <= 0) return {field: "months", text: "Срок не может быть нулевым."};
+    if (S.months != null && (S.months < CFG.minTermMonths || S.months > CFG.maxTermMonths))
+      return {field: "months", text: `Срок ${monthsStr(S.months)} вне диапазона: доступно от ${CFG.minTermMonths} до ${CFG.maxTermMonths} месяцев.`};
+    if (S.down != null && S.down.value < 0) return {field: "down", text: "Аванс не может быть отрицательным."};
+    if (S.down != null && S.down.type === "pct" && S.down.value >= 100) return {field: "down", text: "Аванс не может быть 100% стоимости и больше."};
+    const d = downAmount();
+    if (d != null && d >= S.cost) return {field: "down", text: `Аванс ${money(d)} не может быть больше или равен стоимости ${money(S.cost)}.`};
+    if (d != null && d < S.cost * CFG.minDownPct / 100 - 0.5)
+      return {field: "down", text: `Минимальный аванс — ${CFG.minDownPct}% стоимости, то есть от ${money(S.cost * CFG.minDownPct / 100)}.`};
+    return null;
+  }
+  function apply(p){
+    if (p.cost != null) S.cost = p.cost;
+    if (p.downPct != null) S.down = {type: "pct", value: p.downPct};
+    else if (p.downAmt != null) S.down = {type: "amt", value: p.downAmt};
+    if (p.months != null) S.months = p.months;
+  }
+  function fromAi(x){
+    if (!x) return null;
+    const n = v => typeof v === "number" && isFinite(v) ? v : null;
+    return {cost: n(x.cost_tenge), downPct: n(x.down_payment_percent), downAmt: n(x.down_payment_tenge), months: n(x.term_months) != null ? Math.round(x.term_months) : null};
+  }
+  const has = p => !!p && (p.cost != null || p.downPct != null || p.downAmt != null || p.months != null);
+
+  // ---------- чат ----------
+  function say(role, text, extra){ S.msgs.push({role, text, ...extra}); renderMsgs(); }
+  function renderMsgs(){
+    const box = $("msgs");
+    box.innerHTML = S.msgs.map(m => `<div class="msg ${m.role}${m.bad ? " bad" : ""}">${esc(m.text)}${m.src ? `<span class="src">${esc(m.src)}</span>` : ""}</div>`).join("")
+      + (S.busy ? `<div class="msg bot"><span class="typing" aria-label="Помощник печатает"><i></i><i></i><i></i></span></div>` : "");
+    box.scrollTop = box.scrollHeight;
+  }
+  function renderChips(){
+    $("chips").innerHTML = (S.msgs.length > 1 ? `<button type="button" class="chip" id="reset">↺ Начать заново</button>` : "")
+      + EXAMPLES.map((e, k) => `<button type="button" class="chip" data-ex="${k}">${esc(e)}</button>`).join("");
+    $("chips").querySelectorAll("[data-ex]").forEach(b => b.onclick = () => handle(EXAMPLES[+b.dataset.ex]));
+    const r = $("reset"); if (r) r.onclick = reset;
+  }
+  function renderCtx(){
+    const items = [];
+    if (S.cost != null) items.push(money(S.cost));
+    if (S.down != null) items.push("аванс " + (S.down.type === "pct" ? pctStr(S.down.value) : money(S.down.value)));
+    if (S.months != null) items.push(monthsStr(S.months));
+    $("ctx").innerHTML = items.map(i => `<span>${esc(i)}</span>`).join("");
+    $("ctx").hidden = !items.length;
+  }
+
+  async function handle(text){
+    text = text.trim();
+    if (!text || S.busy) return;
+    say("me", text);
+    S.busy = true; renderMsgs(); $("send").disabled = true;
+
+    // Гибрид: правила разбирают мгновенно; если после них чего-то не хватает, подключаем ИИ.
+    const rules = parseDeal(text, S.pending);
+    const before = {cost: S.cost, down: S.down, months: S.months};
+    apply(rules);
+    let source = has(rules) ? "распознано правилами" : "";
+    if (!complete() || !has(rules)) {
+      Object.assign(S, before);
+      const r = await ai("extract", {text, pending: S.pending});
+      const p = fromAi(r && r.params);
+      apply(rules);
+      if (has(p)) { apply(p); source = "распознано ИИ"; }
+    }
+    S.busy = false; $("send").disabled = false;
+
+    if (!source) {
+      say("bot", S.pending ? `Не понял ответ. ${QUESTIONS[S.pending]}` : "Не удалось распознать параметры. Напишите стоимость, аванс и срок, например: «оборудование за 10 млн, аванс 20%, на 24 месяца».");
+    } else {
+      if (rules.guessedMillions && source === "распознано правилами") source += " · сумма понята в миллионах";
+      step(source);
+    }
+    renderChips();
+  }
+
+  function step(source){
+    const err = validate();
+    if (err) {
+      S[err.field] = null; S.pending = err.field; S.result = null;
+      say("bot", `${err.text}\n${QUESTIONS[err.field]}`, {bad: true});
+      renderAll(); return;
+    }
+    const missing = ["cost", "down", "months"].find(f => S[f] == null);
+    if (missing) {
+      S.pending = missing;
+      const got = describeParams();
+      say("bot", (got ? `Понял: ${got}.\n` : "") + QUESTIONS[missing], {src: source});
+      S.result = null; renderAll(); return;
+    }
+    S.pending = null;
+    calculate();
+    renderParams();
+    const r = S.result;
+    say("bot", `Понял: ${describeParams()}.\nЕжемесячный платёж — ${money(r.payment)}, переплата — ${money(r.overpayment)}. График и пояснение ниже.`, {src: source});
+  }
+
+  // ---------- расчёт ----------
+  let explainTimer = null;
+  function calculate(){
+    const d = downAmount();
+    S.result = {cost: S.cost, down: d, downPct: d / S.cost * 100, months: S.months, rate: CFG.annualRatePct, ...annuity(S.cost, d, S.months, CFG.annualRatePct)};
+    S.lead = false;
+    S.explain = {text: templateExplain(S.result), src: "шаблон"};
+    renderResult(); renderCtx(); writeHash();
+    // Пояснение от ИИ запрашиваем после паузы, чтобы не дёргать модель при движении ползунка.
+    clearTimeout(explainTimer);
+    const r = S.result;
+    explainTimer = setTimeout(() => {
+      ai("explain", {data: {cost: plain(r.cost), down: plain(r.down), downPct: Math.round(r.downPct * 100) / 100, financed: plain(r.financed),
+        months: r.months, rate: r.rate, payment: plain(r.payment), total: plain(r.total), overpayment: plain(r.overpayment)}})
+        .then(x => { if (x && x.text && S.result === r) { S.explain = {text: x.text, src: "ИИ"}; renderResult(); } });
+    }, 700);
+  }
+  function templateExplain(r){
+    return `Вы вносите аванс ${money(r.down)} (${pctStr(r.downPct)} стоимости), остальные ${money(r.financed)} финансирует лизинговая компания. ` +
+      `Дальше в течение ${r.months} ${plural(r.months, "месяца", "месяцев", "месяцев")} вы платите одинаковую сумму — ${money(r.payment)} в месяц, всего ${money(r.total)}. ` +
+      `Переплата ${money(r.overpayment)} — это удорожание за пользование финансированием по ставке ${r.rate}% годовых.`;
+  }
+
+  // ---------- карточка параметров ----------
+  function renderParams(){
+    const d = downAmount(), p = downPct();
+    const pctSlider = p == null ? 20 : Math.min(90, Math.max(CFG.minDownPct, Math.round(p)));
+    $("params").innerHTML = `
+      <div class="row between"><h2>Параметры лизинга</h2><span class="muted small">из чата или вручную</span></div>
+      <div>
+        <div class="field"><div class="col"><label for="pCost">Стоимость предмета лизинга</label>
+          <input type="text" id="pCost" inputmode="numeric" placeholder="Например, 15 000 000" value="${S.cost != null ? plain(S.cost) : ""}"></div><span class="suffix">₸</span></div>
+        <div class="range"><input type="range" id="rCost" min="${COST_MIN}" max="${COST_MAX}" step="500000" value="${S.cost != null ? Math.min(COST_MAX, Math.max(COST_MIN, S.cost)) : 15e6}" aria-label="Стоимость, ползунок">
+          <div class="ends"><span>1 млн ₸</span><span>300 млн ₸</span></div></div>
+      </div>
+      <div>
+        <div class="pair">
+          <div class="field"><div class="col"><label for="pDown">Первоначальный взнос</label>
+            <input type="text" id="pDown" inputmode="numeric" placeholder="${S.cost != null ? plain(S.cost * CFG.minDownPct / 100) + " и больше" : "Сумма"}" value="${d != null ? plain(d) : ""}"></div><span class="suffix">₸</span></div>
+          <div class="field"><div class="col"><label for="pPct">Аванс</label>
+            <input type="text" id="pPct" inputmode="decimal" placeholder="от ${CFG.minDownPct}" value="${p != null ? Math.round(p * 100) / 100 : ""}"></div><span class="suffix">%</span></div>
+        </div>
+        <div class="range"><input type="range" id="rPct" min="${CFG.minDownPct}" max="90" step="1" value="${pctSlider}" aria-label="Аванс в процентах, ползунок" ${S.cost == null ? "disabled" : ""}>
+          <div class="ends"><span>${CFG.minDownPct}%</span><span>90%</span></div></div>
+      </div>
+      <div>
+        <div class="field"><div class="col"><label for="pMonths">Срок лизинга</label>
+          <input type="text" id="pMonths" inputmode="numeric" placeholder="${CFG.minTermMonths}–${CFG.maxTermMonths}" value="${S.months ?? ""}"></div><span class="suffix">мес.</span></div>
+        <div class="range"><input type="range" id="rMonths" min="${CFG.minTermMonths}" max="${CFG.maxTermMonths}" step="1" value="${S.months ?? 24}" aria-label="Срок, ползунок">
+          <div class="ends"><span>${CFG.minTermMonths} мес.</span><span>${CFG.maxTermMonths} мес.</span></div></div>
+      </div>
+      <div class="err" id="pErr" hidden></div>
+      <p class="muted small">Тестовая ставка удорожания — ${CFG.annualRatePct}% годовых. Ползунки меняют расчёт сразу.</p>`;
+
+    const recalcFromForm = () => {
+      const err = validate(), box = $("pErr");
+      box.hidden = !err; box.textContent = err ? err.text : "";
+      if (err) { S.result = null; renderResult(); renderCtx(); return; }
+      if (complete()) calculate(); else { S.result = null; renderResult(); renderCtx(); }
+    };
+    const syncDown = () => { const d2 = downAmount(), p2 = downPct();
+      if (d2 != null) { $("pDown").value = plain(d2); $("pPct").value = Math.round(p2 * 100) / 100; $("rPct").value = Math.min(90, Math.max(CFG.minDownPct, Math.round(p2))); } };
+
+    $("pCost").addEventListener("change", e => { S.cost = digits(e.target.value); if (S.cost) $("rCost").value = S.cost; $("rPct").disabled = S.cost == null; e.target.value = S.cost != null ? plain(S.cost) : ""; syncDown(); recalcFromForm(); });
+    $("rCost").addEventListener("input", e => { S.cost = +e.target.value; $("pCost").value = plain(S.cost); $("rPct").disabled = false; syncDown(); recalcFromForm(); });
+    $("pDown").addEventListener("change", e => { const v = digits(e.target.value); S.down = v == null ? null : {type: "amt", value: v}; syncDown(); recalcFromForm(); });
+    $("pPct").addEventListener("change", e => { const v = digits(e.target.value); S.down = v == null ? null : {type: "pct", value: v}; syncDown(); recalcFromForm(); });
+    $("rPct").addEventListener("input", e => { S.down = {type: "pct", value: +e.target.value}; syncDown(); recalcFromForm(); });
+    $("pMonths").addEventListener("change", e => { const v = digits(e.target.value); S.months = v == null ? null : Math.round(v); if (S.months) $("rMonths").value = S.months; recalcFromForm(); });
+    $("rMonths").addEventListener("input", e => { S.months = +e.target.value; $("pMonths").value = S.months; recalcFromForm(); });
+  }
+
+  // ---------- результат ----------
+  function renderResult(){
+    const box = $("result"), r = S.result;
+    $("heroPay").textContent = r ? money(r.payment) : "—";
+    if (!r) {
+      box.innerHTML = `<div class="card empty stack" style="gap:6px"><h2>Здесь появится расчёт</h2>
+        <p class="muted">Ежемесячный платёж, переплата и график по месяцам. Напишите помощнику или заполните параметры.</p></div>`;
+      return;
+    }
+    box.innerHTML = `
+      <div class="card pad stack">
+        <div class="row between"><h2>Предварительный расчёт</h2><span class="muted small">${esc(describeParams())}</span></div>
+        <div class="kpis">
+          <div class="kpi main"><div class="lbl">Ежемесячный платёж</div><div class="val">${money(r.payment)}</div></div>
+          <div class="kpi"><div class="lbl">Переплата</div><div class="val">${money(r.overpayment)}</div></div>
+          <div class="kpi"><div class="lbl">Сумма финансирования</div><div class="val">${money(r.financed)}</div></div>
+        </div>
+        <div class="explain stack" style="gap:4px"><p>${esc(S.explain.text)}</p><span class="muted small">Пояснение: ${esc(S.explain.src)}</span></div>
+        <div class="disclaimer">Предварительный расчёт, не является офертой. Ставка удорожания ${r.rate}% годовых — тестовая, для демо.</div>
+        <div class="row">
+          <button type="button" class="primary" id="leadBtn">Оставить заявку менеджеру для точного расчёта</button>
+          <button type="button" id="copyBtn">Скопировать расчёт</button>
+          <button type="button" class="ghost" id="linkBtn">Ссылка на расчёт</button>
+        </div>
+        ${S.lead ? `<div class="lead-box stack" style="gap:6px"><h3>Заявка сформирована</h3>
+          <p>${esc(describeParams())}; платёж ${money(r.payment)} в месяц.</p>
+          <p class="muted small">Это демо: заявка никуда не отправляется, личные данные не запрашиваются. В рабочей версии менеджер BCC Leasing получит эти параметры и свяжется для точного расчёта по вашим условиям.</p></div>` : ""}
+      </div>
+      <div class="card pad stack">
+        <div class="row between"><h2>График платежей</h2><span class="muted small">${monthsStr(r.months)} · суммы в тенге</span></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Месяц</th><th>Платёж</th><th>Погашение стоимости</th><th>Удорожание</th><th>Остаток</th></tr></thead>
+          <tbody>${r.schedule.map(x => `<tr><td>${x.month}</td><td>${plain(x.payment)}</td><td>${plain(x.principal)}</td><td>${plain(x.interest)}</td><td>${plain(x.rest)}</td></tr>`).join("")}</tbody>
+          <tfoot><tr><td>Итого</td><td>${plain(r.total)}</td><td>${plain(r.financed)}</td><td>${plain(r.overpayment)}</td><td></td></tr></tfoot>
+        </table></div>
+      </div>`;
+    $("leadBtn").onclick = () => { S.lead = true; renderResult(); };
+    $("copyBtn").onclick = () => copy(summaryText(), "copyBtn");
+    $("linkBtn").onclick = () => copy(location.href, "linkBtn");
+  }
+  function renderAll(){ renderParams(); renderResult(); renderCtx(); }
+
+  function summaryText(){
+    const r = S.result;
+    return ["Предварительный расчёт лизинга (BCC Leasing, демо)",
+      `Стоимость: ${money(r.cost)}`, `Аванс: ${money(r.down)} (${pctStr(r.downPct)})`, `Срок: ${monthsStr(r.months)}`,
+      `Ежемесячный платёж: ${money(r.payment)}`, `Переплата: ${money(r.overpayment)}`, "Не является офертой.", location.href].join("\n");
+  }
+  async function copy(text, btnId){
+    const b = $(btnId), label = b.textContent;
+    try { await navigator.clipboard.writeText(text); b.textContent = "Скопировано"; }
+    catch { b.textContent = "Не удалось скопировать"; }
+    setTimeout(() => { b.textContent = label; }, 1800);
+  }
+
+  // Параметры в адресе: #c=10000000&d=20p&m=24 (p — проценты). Нигде не сохраняются.
+  function writeHash(){
+    const d = S.down.type === "pct" ? S.down.value + "p" : Math.round(S.down.value);
+    history.replaceState(null, "", `#c=${Math.round(S.cost)}&d=${d}&m=${S.months}`);
+  }
+  function readHash(){
+    const q = new URLSearchParams(location.hash.slice(1));
+    const c = parseFloat(q.get("c")), dRaw = q.get("d") || "", m = parseInt(q.get("m"), 10);
+    if (!isFinite(c) || !dRaw || !isFinite(m)) return false;
+    S.cost = c; S.months = m;
+    S.down = {type: dRaw.endsWith("p") ? "pct" : "amt", value: parseFloat(dRaw)};
+    if (!isFinite(S.down.value) || validate()) { S.cost = S.down = S.months = null; return false; }
+    return true;
+  }
+
+  function reset(){
+    Object.assign(S, {cost: null, down: null, months: null, pending: null, msgs: [], result: null, explain: null, lead: false});
+    history.replaceState(null, "", location.pathname);
+    greet(); renderAll();
+  }
+  function greet(){
+    say("bot", "Здравствуйте! Посчитаю предварительный график платежей по лизингу.\nНапишите, что берёте, за сколько, какой аванс и на какой срок. Можно своими словами.");
+    renderChips();
+  }
+
+  // ---------- шапка: тема и полный экран ----------
+  const root = document.documentElement;
+  try { const t = localStorage.getItem("lease.theme"); if (t) root.dataset.theme = t; } catch {}
+  $("themeBtn").onclick = () => {
+    const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+    try { localStorage.setItem("lease.theme", root.dataset.theme); } catch {}
+  };
+  $("fsBtn").onclick = () => { (document.fullscreenElement ? document.exitFullscreen() : root.requestFullscreen?.())?.catch?.(() => {}); };
+  $("focusChat").onclick = () => { $("input").focus(); $("input").scrollIntoView({behavior: "smooth", block: "center"}); };
+
+  $("composer").addEventListener("submit", e => { e.preventDefault(); const v = $("input").value; $("input").value = ""; handle(v); });
+  setAi(S.ai);
+  greet();
+  if (readHash()) { say("bot", `Открыт расчёт по ссылке: ${describeParams()}.`); calculate(); renderParams(); renderCtx(); }
+  else renderAll();
+})();
