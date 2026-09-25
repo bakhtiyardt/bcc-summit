@@ -1,4 +1,4 @@
-// Калькулятор лизинга BCC Leasing (демо): чат и форма → параметры → расчёт по формуле → график.
+// Калькулятор лизинга BCC Leasing: чат и форма → параметры → расчёт по формуле → график.
 (function () {
   "use strict";
   const CFG = window.LEASE_CONFIG;
@@ -223,7 +223,7 @@
           <div class="ends"><span>${CFG.minTermMonths} мес.</span><span>${CFG.maxTermMonths} мес.</span></div></div>
       </div>
       <div class="err" id="pErr" hidden></div>
-      <p class="muted small">Тестовая ставка удорожания — ${CFG.annualRatePct}% годовых. Ползунки меняют расчёт сразу.</p>`;
+      <p class="muted small">Ставка удорожания — ${CFG.annualRatePct}% годовых. Ползунки меняют расчёт сразу.</p>`;
 
     const recalcFromForm = () => {
       const err = validate(), box = $("pErr");
@@ -261,7 +261,7 @@
           <div class="kpi"><div class="lbl">Сумма финансирования</div><div class="val">${money(r.financed)}</div></div>
         </div>
         <div class="explain stack" style="gap:4px"><p>${esc(S.explain.text)}</p><span class="muted small">Пояснение: ${esc(S.explain.src)}</span></div>
-        <div class="disclaimer">Предварительный расчёт, не является офертой. Ставка удорожания ${r.rate}% годовых — тестовая, для демо.</div>
+        <div class="disclaimer">Предварительный расчёт, не является офертой. Ставка удорожания — ${r.rate}% годовых.</div>
         <div class="row">
           <button type="button" class="primary" id="leadBtn">Оставить заявку менеджеру для точного расчёта</button>
           <button type="button" id="pdfBtn">Скачать PDF</button>
@@ -270,7 +270,7 @@
         </div>
         ${S.lead ? `<div class="lead-box stack" style="gap:6px"><h3>Заявка сформирована</h3>
           <p>${esc(describeParams())}; платёж ${money(r.payment)} в месяц.</p>
-          <p class="muted small">Это демо: заявка никуда не отправляется, личные данные не запрашиваются. В рабочей версии менеджер BCC Leasing получит эти параметры и свяжется для точного расчёта по вашим условиям.</p></div>` : ""}
+          <p class="muted small">Скачайте PDF или скопируйте расчёт и отправьте менеджеру BCC Leasing: он подготовит точный расчёт по вашим условиям.</p></div>` : ""}
       </div>
       <div class="card pad stack">
         <div class="row between"><h2>График платежей</h2><span class="muted small">${monthsStr(r.months)} · суммы в тенге</span></div>
@@ -294,7 +294,7 @@
 
   function summaryText(){
     const r = S.result;
-    return ["Предварительный расчёт лизинга (BCC Leasing, демо)",
+    return ["Предварительный расчёт лизинга, BCC Leasing",
       `Стоимость: ${money(r.cost)}`, `Аванс: ${money(r.down)} (${pctStr(r.downPct)})`, `Срок: ${monthsStr(r.months)}`,
       `Ежемесячный платёж: ${money(r.payment)}`, `Переплата: ${money(r.overpayment)}`, "Не является офертой.", location.href].join("\n");
   }

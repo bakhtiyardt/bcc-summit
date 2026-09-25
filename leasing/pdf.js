@@ -63,7 +63,7 @@
       ["Первоначальный взнос", `${money(r.down)} (${pct(r.downPct)})`],
       ["Сумма финансирования", money(r.financed)],
       ["Срок лизинга", `${r.months} ${plural(r.months, "месяц", "месяца", "месяцев")}`],
-      ["Ставка удорожания", `${r.rate}% годовых (тестовая)`],
+      ["Ставка удорожания", `${r.rate}% годовых`],
       ["Всего платежей за срок", money(r.total)],
     ];
     let y = 46;
@@ -120,7 +120,7 @@
     for (let i = 1; i <= pages; i++) {
       doc.setPage(i);
       doc.setFont("Inter", "normal"); doc.setFontSize(7.5); doc.setTextColor(...MUTED);
-      doc.text("BCC Leasing · демо-расчёт · не является офертой", M, 289);
+      doc.text("BCC Leasing · предварительный расчёт · не является офертой", M, 289);
       doc.text(`Стр. ${i} из ${pages}`, W - M, 289, { align: "right" });
       if (i === pages && meta.url) doc.textWithLink("Открыть расчёт онлайн", M, 284, { url: meta.url });
     }
