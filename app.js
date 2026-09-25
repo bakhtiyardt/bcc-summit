@@ -1,4 +1,4 @@
-// Опросы BCC-HUB: статическая страница + Supabase (все права проверяются функциями в базе).
+// Опросы BCC Life: статическая страница + Supabase (все права проверяются функциями в базе).
 const CFG = window.OPROSY_CONFIG || {};
 const APP_URL = location.origin + location.pathname;
 const $app = document.getElementById("app");
@@ -361,7 +361,7 @@ function drawQR(canvas, text){
   c.fillStyle = "#1B1B3A"; roundRect(c, lx, ly, lw, lh, rad); c.fill();
   const fs = Math.round(lh * 0.5);
   c.font = `700 ${fs}px Unbounded, Manrope, system-ui, sans-serif`; c.textBaseline = "middle";
-  const a = "BCC-", b = "HUB", wa = c.measureText(a).width, wb = c.measureText(b).width;
+  const a = "BCC ", b = "Life", wa = c.measureText(a).width, wb = c.measureText(b).width;
   const x = size / 2 - (wa + wb) / 2, y = ly + lh / 2 + fs * 0.04;
   c.fillStyle = "#FFFFFF"; c.fillText(a, x, y); c.fillStyle = "#3FD3E4"; c.fillText(b, x + wa, y);
 }
