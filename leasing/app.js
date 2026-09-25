@@ -301,6 +301,16 @@
   // ---------- заявка менеджеру ----------
   const phoneDigits = s => { let d = String(s).replace(/\D/g, ""); if (d.length === 11 && d[0] === "8") d = "7" + d.slice(1); if (d.length === 10) d = "7" + d; return d; };
   const phonePretty = d => d.length === 11 ? `+${d[0]} ${d.slice(1, 4)} ${d.slice(4, 7)} ${d.slice(7, 9)} ${d.slice(9)}` : d;
+  // Маска ввода: «+7» ставится сам, дальше группы 3-3-2-2. 8 в начале заменяется на 7.
+  function phoneMask(raw){
+    let d = String(raw).replace(/\D/g, "");
+    if (!d) return "";
+    if (d[0] === "8") d = "7" + d.slice(1);
+    if (d[0] !== "7") d = "7" + d;
+    d = d.slice(0, 11);
+    return "+7" + (d.length > 1 ? " " + d.slice(1, 4) : "") + (d.length > 4 ? " " + d.slice(4, 7) : "")
+      + (d.length > 7 ? " " + d.slice(7, 9) : "") + (d.length > 9 ? " " + d.slice(9, 11) : "");
+  }
 
   const emailOk = s => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s);
   // ИИН/БИН Казахстана: 12 цифр, последняя — контрольная (два прохода весов по модулю 11).
@@ -341,7 +351,7 @@
             <input type="tel" id="leadPhone" autocomplete="tel" inputmode="tel" maxlength="20" placeholder="+7 7XX XXX XX XX" value="${esc(S.leadPhone)}"></div></div>
         </div>
         <label class="consent"><input type="checkbox" id="leadConsent" ${S.leadConsent ? "checked" : ""}>
-          <span>Я даю <a class="linklike" href="consent.html" target="_blank" rel="noopener">согласие на сбор и обработку персональных данных</a></span></label>
+          <span>Я даю <a class="linklike" id="consentOpen" href="consent.html">согласие на сбор и обработку персональных данных</a></span></label>
         ${S.leadErr ? `<div class="err">${esc(S.leadErr)}</div>` : ""}
         <button type="submit" class="primary" ${sending ? "disabled" : ""}>${sending ? "Отправляю заявку…" : "Отправить заявку"}</button>
       </form>`;
@@ -359,8 +369,16 @@
     };
     $("leadName").oninput = e => { S.leadName = e.target.value; };
     $("leadEmail").oninput = e => { S.leadEmail = e.target.value; };
-    $("leadPhone").oninput = e => { S.leadPhone = e.target.value; };
-    $("leadPhone").onblur = e => { const d = phoneDigits(e.target.value); if (d.length === 11) { S.leadPhone = e.target.value = phonePretty(d); } };
+    const ph = $("leadPhone");
+    ph.onfocus = () => { if (!ph.value) { ph.value = S.leadPhone = "+7 "; } };
+    ph.onblur = () => { if (ph.value.replace(/\D/g, "") === "7") ph.value = S.leadPhone = ""; };
+    ph.oninput = e => {
+      // Вставка 10 цифр без кода страны (701…) — добавляем 7 спереди.
+      const raw = ph.value, digits = raw.replace(/\D/g, "");
+      const v = e.inputType === "insertFromPaste" && digits.length === 10 && digits[0] !== "8" ? "7" + digits : raw;
+      ph.value = S.leadPhone = phoneMask(v);
+    };
+    $("consentOpen").onclick = e => { e.preventDefault(); openConsent(); };
     $("leadConsent").onchange = e => {
       S.leadConsent = e.target.checked;
       if (S.leadConsent && S.leadErr && S.leadErr.includes("согласие")) { S.leadErr = null; form.querySelector(".err")?.remove(); }
@@ -387,16 +405,50 @@
             summary: {cost: money(r.cost), down: `${money(r.down)} (${pctStr(r.downPct)})`, months: monthsStr(r.months),
               payment: money(r.payment), overpayment: money(r.overpayment), rate: `${r.rate}% годовых`}})
         });
-        if (!res.ok) throw new Error("http_" + res.status);
+        if (!res.ok) { let code = "http_" + res.status; try { code = (await res.json()).error || code; } catch {} throw new Error(code); }
         S.lead = {name, phone, email}; S.leadErr = null;
-      } catch {
+      } catch (err) {
         S.lead = "form";
-        S.leadErr = "Не удалось отправить заявку. Проверьте интернет и попробуйте ещё раз или скачайте PDF и отправьте его менеджеру.";
+        const code = err && err.message && !/fetch|network|load/i.test(err.message) ? err.message : "network";
+        S.leadErr = (code === "network" ? "Нет связи с сервером. Проверьте интернет и попробуйте ещё раз." : "Не удалось отправить заявку. Попробуйте ещё раз или скачайте PDF и отправьте его менеджеру.")
+          + ` Код ошибки: ${code}.`;
+        console.warn("lead failed:", code);
       }
       if (S.result === r) renderResult();
       const done = $("leadDone"); if (done) done.scrollIntoView({behavior: "smooth", block: "center"});
     };
   }
+
+  // ---------- согласие: боковая панель, текст берётся со страницы consent.html ----------
+  let consentHtml = null;
+  async function openConsent(){
+    const drawer = $("consentDrawer"), body = $("consentBody");
+    drawer.hidden = false; requestAnimationFrame(() => drawer.classList.add("open"));
+    document.body.style.overflow = "hidden";
+    $("consentClose").focus();
+    if (!consentHtml) {
+      body.innerHTML = `<p class="muted">Загружаю текст…</p>`;
+      try {
+        const doc = new DOMParser().parseFromString(await (await fetch("consent.html")).text(), "text/html");
+        consentHtml = (doc.querySelector(".notice")?.outerHTML || "") + (doc.querySelector(".doc")?.outerHTML || "");
+      } catch { consentHtml = `<p>Не удалось загрузить текст. <a href="consent.html" target="_blank" rel="noopener">Открыть в новой вкладке</a></p>`; }
+    }
+    body.innerHTML = consentHtml;
+  }
+  function closeConsent(){
+    const drawer = $("consentDrawer");
+    drawer.classList.remove("open"); document.body.style.overflow = "";
+    setTimeout(() => { drawer.hidden = true; }, 250);
+    $("consentOpen")?.focus();
+  }
+  $("consentClose").onclick = closeConsent;
+  $("consentShade").onclick = closeConsent;
+  $("consentAccept").onclick = () => {
+    S.leadConsent = true;
+    const cb = $("leadConsent"); if (cb) { cb.checked = true; cb.dispatchEvent(new Event("change")); }
+    closeConsent();
+  };
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("consentDrawer").hidden) closeConsent(); });
 
   function renderAll(){ renderParams(); renderResult(); renderCtx(); }
 

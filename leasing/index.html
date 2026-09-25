@@ -144,6 +144,22 @@ tfoot td{font-weight:800;background:var(--field);position:sticky;bottom:0}
 .seg{display:inline-flex;gap:4px;background:var(--field);border-radius:12px;padding:4px;align-self:flex-start}
 .seg button{min-height:34px;padding:6px 16px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-size:14px}
 .seg button.on{background:var(--ink);color:var(--surface)}
+.drawer{position:fixed;inset:0;z-index:50}
+.drawer-shade{position:absolute;inset:0;background:rgba(15,18,24,.45);opacity:0;transition:opacity .25s}
+.drawer-panel{position:absolute;top:0;right:0;bottom:0;width:min(560px,100vw);background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;padding-top:env(safe-area-inset-top,0px)}
+.drawer.open .drawer-shade{opacity:1}
+.drawer.open .drawer-panel{transform:none}
+.drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 20px;border-bottom:1px solid var(--line)}
+.drawer-head h2{font-size:17px}
+.drawer-body{flex:1;overflow-y:auto;padding:18px 20px;font-size:14px;line-height:1.6}
+.drawer-body .notice{background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:12px 14px;margin-bottom:16px}
+.drawer-body h2{font-size:15px;font-weight:800;margin:20px 0 8px}
+.drawer-body h2:first-child{margin-top:0}
+.drawer-body p{margin:0 0 10px}
+.drawer-body ul{margin:0 0 10px;padding-left:20px;display:flex;flex-direction:column;gap:5px}
+.drawer-foot{padding:14px 20px calc(14px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}
+.drawer-foot button{width:100%}
+@media (prefers-reduced-motion:reduce){.drawer-shade,.drawer-panel{transition:none}}
 .consent{display:flex;gap:10px;align-items:flex-start;font-size:14px;cursor:pointer}
 .consent input{width:20px;height:20px;margin:1px 0 0;accent-color:var(--accent);flex:none}
 .linklike{display:inline;min-height:0;padding:0;border:0;background:none;color:var(--accent);font-weight:700;font-size:inherit;text-decoration:underline;cursor:pointer}
@@ -209,6 +225,18 @@ tfoot td{font-weight:800;background:var(--field);position:sticky;bottom:0}
   </div>
 
   <section class="results stack" id="result" aria-live="polite"></section>
+  <div class="drawer" id="consentDrawer" hidden>
+    <div class="drawer-shade" id="consentShade"></div>
+    <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="consentDrawerTitle">
+      <div class="drawer-head">
+        <h2 id="consentDrawerTitle">Согласие на сбор и обработку персональных данных</h2>
+        <button type="button" class="icon-btn" id="consentClose" aria-label="Закрыть">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </div>
+      <div class="drawer-body" id="consentBody"></div>
+      <div class="drawer-foot"><button type="button" class="primary" id="consentAccept">Принимаю</button></div>
+    </aside>
+  </div>
   <footer class="site-foot">
     <div class="flogo"><img class="logo-light" src="img/logo.png" alt="bcc leasing" width="966" height="160"><img class="logo-dark" src="img/logo-dark.png" alt="bcc leasing" width="966" height="160"></div>
     <div class="contacts">
@@ -221,9 +249,9 @@ tfoot td{font-weight:800;background:var(--field);position:sticky;bottom:0}
     </div>
   </footer>
 </div>
-<script src="config.js?v=15"></script>
-<script src="calc.js?v=15"></script>
-<script src="pdf.js?v=15"></script>
-<script src="app.js?v=15"></script>
+<script src="config.js?v=16"></script>
+<script src="calc.js?v=16"></script>
+<script src="pdf.js?v=16"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>
