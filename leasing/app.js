@@ -264,6 +264,7 @@
         <div class="disclaimer">Предварительный расчёт, не является офертой. Ставка удорожания ${r.rate}% годовых — тестовая, для демо.</div>
         <div class="row">
           <button type="button" class="primary" id="leadBtn">Оставить заявку менеджеру для точного расчёта</button>
+          <button type="button" id="pdfBtn">Скачать PDF</button>
           <button type="button" id="copyBtn">Скопировать расчёт</button>
           <button type="button" class="ghost" id="linkBtn">Ссылка на расчёт</button>
         </div>
@@ -281,6 +282,12 @@
       </div>`;
     $("leadBtn").onclick = () => { S.lead = true; renderResult(); };
     $("copyBtn").onclick = () => copy(summaryText(), "copyBtn");
+    $("pdfBtn").onclick = async () => {
+      const b = $("pdfBtn"); b.disabled = true; b.textContent = "Готовлю PDF…";
+      try { await window.LeasePdf.download(r, {explain: S.explain.text, url: location.href}); b.textContent = "PDF скачан"; }
+      catch { b.textContent = "Не удалось создать PDF"; }
+      setTimeout(() => { if (document.body.contains(b)) { b.disabled = false; b.textContent = "Скачать PDF"; } }, 2000);
+    };
     $("linkBtn").onclick = () => copy(location.href, "linkBtn");
   }
   function renderAll(){ renderParams(); renderResult(); renderCtx(); }
