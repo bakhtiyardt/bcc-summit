@@ -65,8 +65,7 @@ p{margin:0}
 .hero > *:not(.diamond){position:relative;z-index:1}
 @media (max-width:900px){.diamond{display:none}.hero{padding:32px 0 24px;min-height:0}}
 /* основная сетка */
-.grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;align-items:start}
-@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.grid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start;max-width:760px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
 .pad{padding:22px}
 .stack{display:flex;flex-direction:column;gap:14px}
@@ -200,15 +199,13 @@ tfoot td{font-weight:800;background:var(--field);position:sticky;bottom:0}
     <div class="diamond" aria-hidden="true"><div class="in"><div><small>Ежемесячный платёж</small><strong id="heroPay">—</strong></div></div></div>
     <div class="crumbs">Лизинг · Калькулятор</div>
     <h1>Калькулятор лизинга</h1>
-    <p class="lead">Опишите сделку своими словами. ИИ-помощник распознает стоимость, аванс и срок и за пару секунд покажет платёж и график.</p>
-    <div class="cta"><button type="button" class="primary" id="focusChat">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>
-      Спросить помощника</button></div>
+    <p class="lead" id="heroLead">Укажите стоимость, аванс и срок — платёж и график пересчитаются сразу. Или опишите сделку ИИ-помощнику своими словами.</p>
+    <div class="cta"><button type="button" class="primary" id="modeBtn" aria-controls="chatCard params"></button></div>
   </section>
 
   <div class="grid">
     <section class="card pad stack" id="params" aria-label="Параметры лизинга"></section>
-    <section class="card chat" aria-label="ИИ-помощник">
+    <section class="card chat" id="chatCard" aria-label="ИИ-помощник" hidden>
       <div class="chat-head">
         <span class="chat-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
         <div><h2>ИИ-помощник</h2><p class="muted small">Посчитаю платёж по вашему описанию</p></div>
@@ -249,9 +246,9 @@ tfoot td{font-weight:800;background:var(--field);position:sticky;bottom:0}
     </div>
   </footer>
 </div>
-<script src="config.js?v=16"></script>
-<script src="calc.js?v=16"></script>
-<script src="pdf.js?v=16"></script>
-<script src="app.js?v=16"></script>
+<script src="config.js?v=17"></script>
+<script src="calc.js?v=17"></script>
+<script src="pdf.js?v=17"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

@@ -8,9 +8,12 @@
   const S = {
     cost: null, down: null, months: null,   // down: {type: "pct" | "amt", value}
     pending: null, msgs: [], busy: false,
+    // Режим: калькулятор или помощник. У каждого свои параметры; расчёт идёт от активного.
+    mode: "calc",
+    saved: {chat: {cost: null, down: null, months: null, pending: null}},
     ai: CFG.aiUrl ? "unknown" : "off",
     result: null, explain: null,
-    lead: null, leadType: "ИП", leadBin: "", leadName: "", leadEmail: "", leadPhone: "", leadConsent: false, leadErr: null   // lead: null | "form" | "sending" | {name, phone, email}
+    lead: null, leadBin: "", leadName: "", leadEmail: "", leadPhone: "", leadConsent: false, leadErr: null   // lead: null | "form" | "sending" | {name, phone, email}
   };
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -258,7 +261,7 @@
     $("heroPay").textContent = r ? money(r.payment) : "—";
     if (!r) {
       box.innerHTML = `<div class="card empty stack" style="gap:6px"><h2>Здесь появится расчёт</h2>
-        <p class="muted">Ежемесячный платёж, переплата и график по месяцам. Напишите помощнику или заполните параметры.</p></div>`;
+        <p class="muted">${S.mode === "chat" ? "Опишите сделку помощнику: стоимость, аванс и срок. Как только параметров хватит, здесь появятся платёж и график." : "Заполните стоимость, аванс и срок — платёж и график появятся сразу."}</p></div>`;
       return;
     }
     box.innerHTML = `
@@ -321,7 +324,10 @@
     if (c === 10) c = d.slice(0, 11).reduce((s, x, i) => s + x * ((i + 2) % 11 + 1), 0) % 11;
     return c !== 10 && c === d[11];
   }
-  const idLabel = () => S.leadType === "ТОО" ? "БИН" : "ИИН";
+  // Тип клиента по номеру: у БИН 5-я цифра 4–6 (юрлицо), у ИИН — 0–3 (месяц рождения).
+  const clientTypeOf = id => /^\d{4}[4-6]/.test(id) ? "ТОО" : "ИП";
+  const idLabelOf = id => clientTypeOf(id) === "ТОО" ? "БИН" : "ИИН";
+  const idLabel = () => "ИИН / БИН";
 
   function leadMarkup(r){
     if (!S.lead) return "";
@@ -337,12 +343,9 @@
       <form class="lead-box stack" id="leadForm" novalidate style="gap:10px">
         <h3>Заявка менеджеру</h3>
         <p class="muted small">Менеджер получит расчёт с графиком платежей и свяжется с вами.</p>
-        <div class="seg" role="radiogroup" aria-label="Клиент">
-          ${["ИП", "ТОО"].map(t => `<button type="button" role="radio" aria-checked="${S.leadType === t}" class="${S.leadType === t ? "on" : ""}" data-type="${t}">${t}</button>`).join("")}
-        </div>
-        <div class="field"><div class="col"><label for="leadBin">${idLabel()} ${S.leadType === "ТОО" ? "компании" : "индивидуального предпринимателя"}</label>
+        <div class="field"><div class="col"><label for="leadBin">ИИН / БИН</label>
           <input type="text" id="leadBin" inputmode="numeric" autocomplete="off" maxlength="24" placeholder="12 цифр" value="${esc(S.leadBin)}"></div></div>
-        <div class="field"><div class="col"><label for="leadName">${S.leadType === "ТОО" ? "Контактное лицо" : "Имя"}</label>
+        <div class="field"><div class="col"><label for="leadName">Имя</label>
           <input type="text" id="leadName" autocomplete="name" maxlength="80" placeholder="Как к вам обращаться" value="${esc(S.leadName)}"></div></div>
         <div class="pair" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
           <div class="field"><div class="col"><label for="leadEmail">E-mail</label>
@@ -362,10 +365,9 @@
     if (pdfBtn) pdfBtn.onclick = () => window.LeasePdf.download(r, {explain: S.explain.text, url: location.href}).catch(() => {});
     const form = $("leadForm");
     if (!form) return;
-    form.querySelectorAll("[data-type]").forEach(b => b.onclick = () => { S.leadType = b.dataset.type; renderResult(); });
     $("leadBin").oninput = e => {
       e.target.value = e.target.value.replace(/\D/g, "").slice(0, 12); S.leadBin = e.target.value;
-      if (S.leadErr && S.leadErr.includes(idLabel()) && kzIdOk(S.leadBin)) { S.leadErr = null; form.querySelector(".err")?.remove(); }
+      if (S.leadErr && S.leadErr.includes("ИИН") && kzIdOk(S.leadBin)) { S.leadErr = null; form.querySelector(".err")?.remove(); }
     };
     $("leadName").oninput = e => { S.leadName = e.target.value; };
     $("leadEmail").oninput = e => { S.leadEmail = e.target.value; };
@@ -397,11 +399,11 @@
       const phone = phonePretty(d), consentAt = new Date().toISOString();
       S.lead = "sending"; renderResult();
       try {
-        const pdf = await window.LeasePdf.asBase64(r, {explain: S.explain.text, url: location.href, client: {name, phone, email, type: S.leadType, idLabel: idLabel(), bin}});
+        const pdf = await window.LeasePdf.asBase64(r, {explain: S.explain.text, url: location.href, client: {name, phone, email, type: clientTypeOf(bin), idLabel: idLabelOf(bin), bin}});
         const res = await fetch(CFG.aiUrl, {
           method: "POST",
           headers: {"Content-Type": "application/json", apikey: CFG.supabaseKey},
-          body: JSON.stringify({action: "lead", clientType: S.leadType, bin, name, email, phone, consent: true, consentAt, url: location.href, filename: pdf.filename, pdfBase64: pdf.base64,
+          body: JSON.stringify({action: "lead", clientType: clientTypeOf(bin), bin, name, email, phone, consent: true, consentAt, url: location.href, filename: pdf.filename, pdfBase64: pdf.base64,
             summary: {cost: money(r.cost), down: `${money(r.down)} (${pctStr(r.downPct)})`, months: monthsStr(r.months),
               payment: money(r.payment), overpayment: money(r.overpayment), rate: `${r.rate}% годовых`}})
         });
@@ -483,7 +485,7 @@
   function reset(){
     Object.assign(S, {cost: null, down: null, months: null, pending: null, msgs: [], result: null, explain: null, lead: null, leadErr: null});
     history.replaceState(null, "", location.pathname);
-    greet(); renderAll();
+    greet(); renderResult(); renderCtx();
   }
   function greet(){
     say("bot", "Здравствуйте! Посчитаю предварительный график платежей по лизингу.\nНапишите, что берёте, за сколько, какой аванс и на какой срок. Можно своими словами.");
@@ -499,13 +501,31 @@
     try { localStorage.setItem("lease.theme", root.dataset.theme); } catch {}
   };
   $("fsBtn").onclick = () => { (document.fullscreenElement ? document.exitFullscreen() : root.requestFullscreen?.())?.catch?.(() => {}); };
-  $("focusChat").onclick = () => { $("input").focus(); $("input").scrollIntoView({behavior: "smooth", block: "center"}); };
+  const CHAT_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>`;
+  const CALC_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h2M12 12h2M16 12h0M8 16h2M12 16h2M16 16h0"/></svg>`;
+  function renderMode(){
+    const chat = S.mode === "chat";
+    $("chatCard").hidden = !chat; $("params").hidden = chat;
+    $("modeBtn").innerHTML = chat ? `${CALC_ICON} Использовать калькулятор` : `${CHAT_ICON} Спросить помощника`;
+  }
+  function switchMode(to){
+    if (to === S.mode) return;
+    const cur = {cost: S.cost, down: S.down, months: S.months, pending: S.pending};
+    S.saved[S.mode] = cur;
+    Object.assign(S, S.saved[to] || {cost: null, down: null, months: null, pending: null});
+    S.mode = to; S.lead = null; S.leadErr = null;
+    renderMode();
+    if (complete() && !validate()) { calculate(); } else { S.result = null; renderResult(); }
+    if (to === "calc") renderParams(); else { renderCtx(); $("input").focus({preventScroll: true}); }
+    $(to === "chat" ? "chatCard" : "params").scrollIntoView({behavior: "smooth", block: "start"});
+  }
+  $("modeBtn").onclick = () => switchMode(S.mode === "calc" ? "chat" : "calc");
 
   $("composer").addEventListener("submit", e => { e.preventDefault(); const v = $("input").value; $("input").value = ""; handle(v); });
   // Enter отправляет, Shift+Enter — перенос строки.
   $("input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("composer").requestSubmit(); } });
   setAi(S.ai);
   greet();
-  if (readHash()) { say("bot", `Открыт расчёт по ссылке: ${describeParams()}.`); calculate(); renderParams(); renderCtx(); }
-  else renderAll();
+  if (!readHash()) Object.assign(S, {cost: 15e6, down: {type: "pct", value: 20}, months: 24});  // пример, как на сайте BCC Leasing
+  renderMode(); calculate(); renderParams();
 })();
