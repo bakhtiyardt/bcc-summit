@@ -108,9 +108,10 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:0}
 .chips{display:flex;gap:6px;overflow-x:auto;padding:10px 20px 4px}
 .chip{flex:none;font:inherit;font-size:12px;font-weight:600;min-height:32px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 12px;cursor:pointer}
 .chip:hover{border-color:var(--accent);color:var(--accent)}
-.composer{display:flex;gap:8px;padding:10px 20px 18px}
-.composer input{flex:1;min-width:0;font:inherit;font-size:16px;color:var(--ink);background:var(--field);border:1px solid transparent;border-radius:12px;padding:11px 14px;outline:0}
-.composer input:focus{border-color:var(--accent)}
+.composer{display:flex;flex-direction:column;gap:8px;padding:10px 20px 18px}
+.composer textarea{width:100%;font:inherit;font-size:16px;line-height:1.45;color:var(--ink);background:var(--field);border:1px solid transparent;border-radius:12px;padding:11px 14px;outline:0;resize:none;min-height:calc(3 * 1.45em + 24px)}
+.composer button{width:100%}
+.composer textarea:focus{border-color:var(--accent)}
 button{font:inherit;font-weight:700;font-size:14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 16px;min-height:44px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px}
 button:hover{border-color:var(--accent)}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
@@ -182,7 +183,7 @@ tfoot td{font-weight:800;background:var(--field);position:sticky;bottom:0}
       <div class="msgs" id="msgs" aria-live="polite"></div>
       <div class="chips" id="chips"></div>
       <form class="composer" id="composer" autocomplete="off">
-        <input type="text" id="input" maxlength="500" placeholder="Например: авто за 15 млн, аванс 20%, на 2 года" aria-label="Сообщение помощнику">
+        <textarea id="input" rows="3" maxlength="500" placeholder="Например: авто за 15 млн, аванс 20%, на 2 года" aria-label="Сообщение помощнику"></textarea>
         <button type="submit" class="primary" id="send">Отправить</button>
       </form>
     </section>
@@ -190,9 +191,9 @@ tfoot td{font-weight:800;background:var(--field);position:sticky;bottom:0}
 
   <section class="results stack" id="result" aria-live="polite"></section>
 </div>
-<script src="config.js?v=5"></script>
-<script src="calc.js?v=5"></script>
-<script src="pdf.js?v=5"></script>
-<script src="app.js?v=5"></script>
+<script src="config.js?v=6"></script>
+<script src="calc.js?v=6"></script>
+<script src="pdf.js?v=6"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

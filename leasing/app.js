@@ -342,6 +342,8 @@
   $("focusChat").onclick = () => { $("input").focus(); $("input").scrollIntoView({behavior: "smooth", block: "center"}); };
 
   $("composer").addEventListener("submit", e => { e.preventDefault(); const v = $("input").value; $("input").value = ""; handle(v); });
+  // Enter отправляет, Shift+Enter — перенос строки.
+  $("input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("composer").requestSubmit(); } });
   setAi(S.ai);
   greet();
   if (readHash()) { say("bot", `Открыт расчёт по ссылке: ${describeParams()}.`); calculate(); renderParams(); renderCtx(); }
