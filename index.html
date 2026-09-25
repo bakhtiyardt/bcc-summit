@@ -78,6 +78,9 @@ textarea{resize:vertical;min-height:70px}
 .opt-edit{display:flex;gap:8px;align-items:center}
 .opt-edit input{flex:1;min-width:0}
 .opt-edit button{min-width:44px;padding:0}
+.icon-btn{background:transparent;border-color:transparent;color:var(--muted);min-width:44px;padding:0}
+.icon-btn:hover{color:var(--danger);border-color:var(--line)}
+.radio-dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--muted);opacity:.55;flex:none}
 .notice{border-radius:12px;padding:12px 14px;font-size:14px;background:var(--accent-soft);color:var(--ink)}
 .notice.err{background:var(--danger-soft);color:var(--danger)}
 .notice.ok{background:var(--ok-soft);color:var(--ok)}
@@ -123,8 +126,8 @@ body{margin:0;padding-top:env(safe-area-inset-top,0px)}
   <canvas id="ovCanvas" width="1200" height="1200"></canvas>
   <div class="ov-hint">Наведите камеру телефона на QR-код</div>
 </div>
-<script src="config.js?v=3"></script>
+<script src="config.js?v=4"></script>
 <script src="qrcode.min.js"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

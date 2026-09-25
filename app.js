@@ -39,6 +39,7 @@ const plural = (n, one, few, many) => { const a = n % 10, b = n % 100; return a 
 const hashPoll = () => { const m = location.hash.match(/^#p-([a-z0-9]+)$/i); return m ? m[1] : null; };
 const pollLink = id => APP_URL + "#p-" + id;
 const fmtDate = t => t ? new Date(t).toLocaleString("ru-RU", {day:"numeric", month:"long", hour:"2-digit", minute:"2-digit"}) : "";
+const TRASH = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>`;
 function on(sel, fn){ const el = $app.querySelector(sel); if (el) el.onclick = fn; }
 
 // ---------- автоподбор вариантов ----------
@@ -102,6 +103,7 @@ function render(){
   if (hp) return renderForm(hp);
   if (S.view === "edit") return renderEditor();
   if (S.view === "poll") return renderPoll();
+  if (S.view === "preview") return renderPreview();
   renderList();
 }
 
@@ -165,7 +167,7 @@ function renderEditor(){
   const qs = d.questions.map((q, qi) => `
     <div class="q-edit" data-q="${qi}">
       <div class="row between"><span class="q-num">Вопрос ${qi+1}</span>
-        ${d.questions.length > 1 ? `<button type="button" class="ghost danger" data-delq="${qi}">Удалить вопрос</button>` : ""}</div>
+        ${d.questions.length > 1 ? `<button type="button" class="icon-btn" data-delq="${qi}" aria-label="Удалить вопрос ${qi+1}" title="Удалить вопрос">${TRASH}</button>` : ""}</div>
       <label class="f">Текст вопроса<input type="text" id="q-${q.id}" data-qtext="${qi}" value="${esc(q.text)}" placeholder="Например: Как вам темп подачи материала?" maxlength="200"></label>
       <div class="stack" style="gap:8px">
         <div class="row between">
@@ -174,8 +176,9 @@ function renderEditor(){
         </div>
         ${q.options.length ? q.options.map((o, oi) => `
           <div class="opt-edit">
+            <span class="radio-dot" aria-hidden="true"></span>
             <input type="text" id="o-${q.id}-${oi}" data-opt="${qi}:${oi}" value="${esc(o)}" maxlength="120" aria-label="Вариант ${oi+1}">
-            <button type="button" data-delo="${qi}:${oi}" aria-label="Удалить вариант" ${q.options.length <= 2 ? "disabled" : ""}>✕</button>
+            <button type="button" class="icon-btn" data-delo="${qi}:${oi}" aria-label="Удалить вариант" title="Удалить вариант" ${q.options.length <= 2 ? "disabled" : ""}>✕</button>
           </div>`).join("") : `<p class="muted small">Введите текст вопроса, и варианты появятся автоматически.</p>`}
         <div class="row">
           <button type="button" class="ghost" data-addo="${qi}" ${q.options.length >= 10 ? "disabled" : ""}>+ Вариант</button>
@@ -195,6 +198,7 @@ function renderEditor(){
       <button type="button" id="addQ">+ Добавить вопрос</button>
       ${S.msg ? `<div class="notice ${S.msg.type||""}">${esc(S.msg.text)}</div>` : ""}
       <div class="row">
+        <button type="button" id="preview">Предпросмотр</button>
         <button type="button" id="save" ${S.busy ? "disabled" : ""}>Сохранить черновик</button>
         <button type="button" class="primary" id="publish" ${S.busy ? "disabled" : ""}>Опубликовать и получить ссылку</button>
       </div>
@@ -202,6 +206,7 @@ function renderEditor(){
     </div>`;
   on("#back", toList);
   on("#addQ", () => { d.questions.push({id:rid(), text:"", options:[], auto:false}); render(); document.getElementById("q-" + d.questions.at(-1).id)?.focus(); });
+  on("#preview", () => { S.view = "preview"; S.pvForm = {}; S.pvMsg = null; render(); scrollTo(0,0); });
   on("#save", () => savePoll("draft"));
   on("#publish", () => savePoll("published"));
   document.getElementById("t-title").oninput = e => d.title = e.target.value;
@@ -386,6 +391,45 @@ async function loadPublicPoll(id){
   render();
 }
 
+function formQuestions(p, picked){
+  return p.questions.map((q, qi) => `
+        <fieldset class="card form-q" style="margin:0">
+          <legend class="q-num" style="padding:0">Вопрос ${qi+1} из ${p.questions.length}</legend>
+          <h3>${esc(q.text)}</h3>
+          ${q.options.map((o, oi) => `<label class="opt"><input type="radio" name="q_${esc(q.id)}" id="r-${esc(q.id)}-${oi}" value="${oi}" ${picked[q.id] === oi ? "checked" : ""}><span>${esc(o)}</span></label>`).join("")}
+        </fieldset>`).join("");
+}
+
+// Предпросмотр черновика глазами участника: ответы никуда не отправляются.
+function renderPreview(){
+  const d = S.draft;
+  const p = {
+    title:d.title.trim() || "Без названия", description:d.description.trim(),
+    questions:d.questions.filter(q => q.text.trim()).map(q => ({id:q.id, text:q.text.trim(), options:q.options.map(o => o.trim()).filter(Boolean)}))
+  };
+  $app.innerHTML = `
+    <div class="stack">
+      <div class="row between"><button type="button" class="ghost" id="backEdit">← К редактированию</button><span class="pill auto">Предпросмотр</span></div>
+      <div class="notice">Так форму увидит участник. Здесь можно выбирать ответы, но анкета не отправляется.</div>
+      <form class="stack" id="pvform" novalidate>
+        <div class="stack" style="gap:6px"><h1>${esc(p.title)}</h1>${p.description ? `<p class="muted">${esc(p.description)}</p>` : ""}</div>
+        ${p.questions.length ? formQuestions(p, S.pvForm) : `<p class="muted">Добавьте хотя бы один вопрос с текстом.</p>`}
+        ${S.pvMsg ? `<div class="notice ${S.pvMsg.type}">${esc(S.pvMsg.text)}</div>` : ""}
+        <button type="submit" class="primary">Отправить анкету</button>
+        <p class="muted small center">Анкета анонимна: имя и контакты не запрашиваются. Результаты видит только автор опроса.</p>
+      </form>
+    </div>`;
+  on("#backEdit", () => { S.view = "edit"; render(); scrollTo(0,0); });
+  const f = document.getElementById("pvform");
+  f.addEventListener("change", e => { if (e.target.type === "radio") S.pvForm[e.target.name.slice(2)] = +e.target.value; });
+  f.addEventListener("submit", e => {
+    e.preventDefault();
+    const missing = p.questions.findIndex(q => !Number.isInteger(S.pvForm[q.id]));
+    S.pvMsg = missing >= 0 ? {type:"err", text:`Ответьте на вопрос ${missing + 1}.`} : {type:"ok", text:"Всё заполнено. В предпросмотре анкета не отправляется."};
+    render();
+  });
+}
+
 function renderForm(id){
   const p = S.pub;
   if (S.pubState === "loading"){ $app.innerHTML = `<p class="muted">Загрузка опроса…</p>`; return; }
@@ -398,12 +442,7 @@ function renderForm(id){
   $app.innerHTML = `
     <form class="stack" id="pform" novalidate>
       <div class="stack" style="gap:6px"><h1>${esc(p.title)}</h1>${p.description ? `<p class="muted">${esc(p.description)}</p>` : ""}</div>
-      ${p.questions.map((q, qi) => `
-        <fieldset class="card form-q" style="margin:0">
-          <legend class="q-num" style="padding:0">Вопрос ${qi+1} из ${p.questions.length}</legend>
-          <h3>${esc(q.text)}</h3>
-          ${q.options.map((o, oi) => `<label class="opt"><input type="radio" name="q_${esc(q.id)}" id="r-${esc(q.id)}-${oi}" value="${oi}" ${S.form[q.id] === oi ? "checked" : ""}><span>${esc(o)}</span></label>`).join("")}
-        </fieldset>`).join("")}
+      ${formQuestions(p, S.form)}
       ${S.formMsg ? `<div class="notice err">${esc(S.formMsg)}</div>` : ""}
       <button type="submit" class="primary" ${S.formState === "sending" ? "disabled" : ""}>${S.formState === "sending" ? `<span class="spin"></span> Отправка…` : "Отправить анкету"}</button>
       <p class="muted small center">Анкета анонимна: имя и контакты не запрашиваются. Результаты видит только автор опроса.</p>
