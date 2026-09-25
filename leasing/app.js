@@ -10,7 +10,7 @@
     pending: null, msgs: [], busy: false,
     ai: CFG.aiUrl ? "unknown" : "off",
     result: null, explain: null,
-    lead: null, leadName: "", leadPhone: "", leadErr: null   // lead: null | "form" | "sending" | {name, phone}
+    lead: null, leadName: "", leadEmail: "", leadPhone: "", leadConsent: false, leadErr: null   // lead: null | "form" | "sending" | {name, phone, email}
   };
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -300,13 +300,15 @@
   const phoneDigits = s => { let d = String(s).replace(/\D/g, ""); if (d.length === 11 && d[0] === "8") d = "7" + d.slice(1); if (d.length === 10) d = "7" + d; return d; };
   const phonePretty = d => d.length === 11 ? `+${d[0]} ${d.slice(1, 4)} ${d.slice(4, 7)} ${d.slice(7, 9)} ${d.slice(9)}` : d;
 
+  const emailOk = s => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s);
+
   function leadMarkup(r){
     if (!S.lead) return "";
     if (typeof S.lead === "object") return `
       <div class="lead-box stack" style="gap:8px" id="leadDone">
         <h3>Спасибо, ${esc(S.lead.name)}! Заявка отправлена</h3>
         <p>Ваш расчёт: ${esc(describeParams())}. Ежемесячный платёж — <b>${money(r.payment)}</b>, переплата — ${money(r.overpayment)}.</p>
-        <p>Заявку получил менеджер BCC Leasing. В ближайшее время он свяжется с вами по номеру <b>${esc(S.lead.phone)}</b>, уточнит условия и подготовит точный расчёт.</p>
+        <p>Заявку получил менеджер BCC Leasing. В ближайшее время он свяжется с вами по телефону <b>${esc(S.lead.phone)}</b> или по почте <b>${esc(S.lead.email)}</b>, уточнит условия и подготовит точный расчёт.</p>
         <div class="row"><button type="button" id="leadPdf">Скачать PDF расчёта</button></div>
       </div>`;
     const sending = S.lead === "sending";
@@ -314,15 +316,18 @@
       <form class="lead-box stack" id="leadForm" novalidate style="gap:10px">
         <h3>Заявка менеджеру</h3>
         <p class="muted small">Менеджер получит расчёт с графиком платежей и свяжется с вами.</p>
-        <div class="pair" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
-          <div class="field"><div class="col"><label for="leadName">Имя</label>
-            <input type="text" id="leadName" autocomplete="name" maxlength="80" placeholder="Как к вам обращаться" value="${esc(S.leadName)}"></div></div>
+        <div class="field"><div class="col"><label for="leadName">Имя</label>
+          <input type="text" id="leadName" autocomplete="name" maxlength="80" placeholder="Как к вам обращаться" value="${esc(S.leadName)}"></div></div>
+        <div class="pair" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+          <div class="field"><div class="col"><label for="leadEmail">E-mail</label>
+            <input type="email" id="leadEmail" autocomplete="email" inputmode="email" maxlength="120" placeholder="name@company.kz" value="${esc(S.leadEmail)}"></div></div>
           <div class="field"><div class="col"><label for="leadPhone">Телефон</label>
             <input type="tel" id="leadPhone" autocomplete="tel" inputmode="tel" maxlength="20" placeholder="+7 7XX XXX XX XX" value="${esc(S.leadPhone)}"></div></div>
         </div>
+        <label class="consent"><input type="checkbox" id="leadConsent" ${S.leadConsent ? "checked" : ""}>
+          <span>Я даю согласие на сбор и обработку моих персональных данных. <button type="button" class="linklike" id="consentMore">Подробнее</button></span></label>
         ${S.leadErr ? `<div class="err">${esc(S.leadErr)}</div>` : ""}
         <button type="submit" class="primary" ${sending ? "disabled" : ""}>${sending ? "Отправляю заявку…" : "Отправить заявку"}</button>
-        <p class="muted small">Нажимая «Отправить заявку», вы соглашаетесь, что BCC Leasing свяжется с вами по этой заявке.</p>
       </form>`;
   }
 
@@ -332,26 +337,36 @@
     const form = $("leadForm");
     if (!form) return;
     $("leadName").oninput = e => { S.leadName = e.target.value; };
+    $("leadEmail").oninput = e => { S.leadEmail = e.target.value; };
     $("leadPhone").oninput = e => { S.leadPhone = e.target.value; };
     $("leadPhone").onblur = e => { const d = phoneDigits(e.target.value); if (d.length === 11) { S.leadPhone = e.target.value = phonePretty(d); } };
+    $("leadConsent").onchange = e => {
+      S.leadConsent = e.target.checked;
+      if (S.leadConsent && S.leadErr && S.leadErr.includes("согласие")) { S.leadErr = null; form.querySelector(".err")?.remove(); }
+    };
+    $("consentMore").onclick = () => $("consentDialog").showModal();
     form.onsubmit = async e => {
       e.preventDefault();
-      const name = S.leadName.trim(), d = phoneDigits(S.leadPhone);
-      S.leadErr = name.length < 2 ? "Укажите имя." : !(d.length === 11 && d[0] === "7") ? "Укажите телефон в формате +7 7XX XXX XX XX." : null;
+      const name = S.leadName.trim(), email = S.leadEmail.trim(), d = phoneDigits(S.leadPhone);
+      S.leadErr = name.length < 2 ? "Укажите имя."
+        : !emailOk(email) ? "Укажите e-mail, например name@company.kz."
+        : !(d.length === 11 && d[0] === "7") ? "Укажите телефон в формате +7 7XX XXX XX XX."
+        : !S.leadConsent ? "Чтобы отправить заявку, подтвердите согласие на обработку персональных данных."
+        : null;
       if (S.leadErr) { renderResult(); return; }
-      const phone = phonePretty(d);
+      const phone = phonePretty(d), consentAt = new Date().toISOString();
       S.lead = "sending"; renderResult();
       try {
-        const pdf = await window.LeasePdf.asBase64(r, {explain: S.explain.text, url: location.href, client: {name, phone}});
+        const pdf = await window.LeasePdf.asBase64(r, {explain: S.explain.text, url: location.href, client: {name, phone, email}});
         const res = await fetch(CFG.aiUrl, {
           method: "POST",
           headers: {"Content-Type": "application/json", apikey: CFG.supabaseKey},
-          body: JSON.stringify({action: "lead", name, phone, url: location.href, filename: pdf.filename, pdfBase64: pdf.base64,
+          body: JSON.stringify({action: "lead", name, email, phone, consent: true, consentAt, url: location.href, filename: pdf.filename, pdfBase64: pdf.base64,
             summary: {cost: money(r.cost), down: `${money(r.down)} (${pctStr(r.downPct)})`, months: monthsStr(r.months),
               payment: money(r.payment), overpayment: money(r.overpayment), rate: `${r.rate}% годовых`}})
         });
         if (!res.ok) throw new Error("http_" + res.status);
-        S.lead = {name, phone}; S.leadErr = null;
+        S.lead = {name, phone, email}; S.leadErr = null;
       } catch {
         S.lead = "form";
         S.leadErr = "Не удалось отправить заявку. Проверьте интернет и попробуйте ещё раз или скачайте PDF и отправьте его менеджеру.";

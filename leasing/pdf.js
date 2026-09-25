@@ -61,7 +61,7 @@
       doc.setFillColor(...FIELD); doc.roundedRect(M, 41, CW, 12, 2, 2, "F");
       doc.setFont("Inter", "normal"); doc.setFontSize(8.5); doc.setTextColor(...MUTED); doc.text("Клиент", M + 4, 46);
       doc.setFont("Inter", "bold"); doc.setFontSize(11); doc.setTextColor(...INK);
-      doc.text(`${meta.client.name} · ${meta.client.phone}`, M + 4, 50.8);
+      doc.text([meta.client.name, meta.client.phone, meta.client.email].filter(Boolean).join(" · "), M + 4, 50.8);
       shift = 16;
     }
 

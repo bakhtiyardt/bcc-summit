@@ -86,17 +86,22 @@ async function sendLead(b: Record<string, unknown>) {
   const name = String(b.name ?? "").trim().slice(0, 80);
   const phone = String(b.phone ?? "").trim();
   const digits = phone.replace(/\D/g, "");
+  const email = String(b.email ?? "").trim().slice(0, 120);
   const pdf = String(b.pdfBase64 ?? "");
   const s = (b.summary ?? {}) as Record<string, unknown>;
-  if (name.length < 2 || digits.length < 10 || digits.length > 15) return json({ error: "bad_contact" }, 400);
+  if (name.length < 2 || digits.length < 10 || digits.length > 15 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return json({ error: "bad_contact" }, 400);
+  if (b.consent !== true) return json({ error: "no_consent" }, 400);
+  const t = Date.parse(String(b.consentAt ?? ""));
+  const consentAt = isNaN(t) ? new Date() : new Date(t);
   if (!/^[A-Za-z0-9+/=]+$/.test(pdf) || pdf.length > 2_000_000) return json({ error: "bad_pdf" }, 400);
   const key = Deno.env.get("RESEND_API_KEY"), to = Deno.env.get("LEAD_EMAIL");
   if (!key || !to) return json({ error: "mail_not_configured" }, 500);
 
   const rows = [
-    ["Клиент", name], ["Телефон", phone],
+    ["Клиент", name], ["Телефон", phone], ["E-mail", email],
     ["Стоимость предмета лизинга", s.cost], ["Первоначальный взнос", s.down], ["Срок", s.months],
     ["Ежемесячный платёж", s.payment], ["Переплата", s.overpayment], ["Ставка удорожания", s.rate],
+    ["Согласие на обработку ПД", `получено ${consentAt.toLocaleString("ru-RU", { timeZone: "Asia/Almaty" })} (Алматы)`],
   ];
   const html = `<div style="font-family:Arial,sans-serif;font-size:14px;color:#1E232C">
     <h2 style="margin:0 0 12px">Новая заявка на лизинг</h2>
@@ -111,6 +116,7 @@ async function sendLead(b: Record<string, unknown>) {
     body: JSON.stringify({
       from: "BCC Leasing <onboarding@resend.dev>",
       to: [to],
+      reply_to: email,
       subject: `Заявка на лизинг: ${name}, ${s.payment ?? ""} в месяц`,
       html,
       attachments: [{ filename: String(b.filename ?? "raschet.pdf").replace(/[^\w.\-]/g, "_"), content: pdf }],
