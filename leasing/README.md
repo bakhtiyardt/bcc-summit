@@ -19,7 +19,12 @@
 1. Supabase → проект bcc-summit → **Edge Functions** → **Deploy a new function** → **Via Editor**.
 2. Имя функции: `lease-ai`. Вставить содержимое `edge-function/index.ts`, нажать **Deploy**.
 3. У функции открыть **Details** и выключить **Verify JWT with legacy secret** (страница передаёт publishable-ключ, а не JWT). Сохранить.
-4. **Edge Functions → Secrets** → добавить `ANTHROPIC_API_KEY` = ключ из console.anthropic.com.
+4. **Edge Functions → Secrets** → добавить:
+   - `ANTHROPIC_API_KEY` — ключ из console.anthropic.com;
+   - `RESEND_API_KEY` — ключ из resend.com (для отправки заявок);
+   - `LEAD_EMAIL` — адрес, куда приходят заявки с PDF.
+
+Заявка: клиент указывает имя и телефон, страница формирует PDF с контактами и графиком, функция отправляет его письмом на `LEAD_EMAIL` через Resend. Адрес получателя хранится только в секрете.
 
 После саммита ключ лучше отозвать: функция открыта для вызова со страницы.
 

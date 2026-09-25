@@ -34,8 +34,8 @@
   const pct = n => (Math.round(n * 100) / 100).toString().replace(".", ",") + "%";
   const plural = (n, one, few, many) => { const a = n % 10, b = n % 100; return a === 1 && b !== 11 ? one : a >= 2 && a <= 4 && (b < 10 || b >= 20) ? few : many; };
 
-  // r — результат расчёта из app.js; meta — {explain, url}.
-  async function download(r, meta) {
+  // r — результат расчёта из app.js; meta — {explain, url, client?: {name, phone}}.
+  async function build(r, meta) {
     const fonts = await prepare();
     const doc = new window.jspdf.jsPDF({ unit: "mm", format: "a4" });
     doc.addFileToVFS("Inter-Regular.ttf", fonts.regular); doc.addFont("Inter-Regular.ttf", "Inter", "normal");
@@ -55,7 +55,15 @@
     doc.setDrawColor(...LINE); doc.setLineWidth(0.3); doc.line(M, 25, W - M, 25);
 
     doc.setFont("Inter", "bold"); doc.setFontSize(18); doc.setTextColor(...INK);
-    doc.text("Предварительный расчёт лизинга", M, 36);
+    doc.text(meta.client ? "Заявка на лизинг" : "Предварительный расчёт лизинга", M, 36);
+    let shift = 0;
+    if (meta.client) {  // блок с контактами клиента для менеджера
+      doc.setFillColor(...FIELD); doc.roundedRect(M, 41, CW, 12, 2, 2, "F");
+      doc.setFont("Inter", "normal"); doc.setFontSize(8.5); doc.setTextColor(...MUTED); doc.text("Клиент", M + 4, 46);
+      doc.setFont("Inter", "bold"); doc.setFontSize(11); doc.setTextColor(...INK);
+      doc.text(`${meta.client.name} · ${meta.client.phone}`, M + 4, 50.8);
+      shift = 16;
+    }
 
     // Параметры сделки: две колонки «подпись — значение»
     const params = [
@@ -66,7 +74,7 @@
       ["Ставка удорожания", `${r.rate}% годовых`],
       ["Всего платежей за срок", money(r.total)],
     ];
-    let y = 46;
+    let y = 46 + shift;
     params.forEach((p, k) => {
       const x = k % 2 === 0 ? M : M + CW / 2 + 4, yy = y + Math.floor(k / 2) * 12;
       doc.setFont("Inter", "normal"); doc.setFontSize(8.5); doc.setTextColor(...MUTED); doc.text(p[0], x, yy);
@@ -124,8 +132,11 @@
       doc.text(`Стр. ${i} из ${pages}`, W - M, 289, { align: "right" });
       if (i === pages && meta.url) doc.textWithLink("Открыть расчёт онлайн", M, 284, { url: meta.url });
     }
-    doc.save(`BCC_Leasing_raschet_${Math.round(r.cost)}_${r.months}m.pdf`);
+    return doc;
   }
+  const fileName = r => `BCC_Leasing_raschet_${Math.round(r.cost)}_${r.months}m.pdf`;
+  async function download(r, meta) { (await build(r, meta)).save(fileName(r)); }
+  async function asBase64(r, meta) { return {filename: fileName(r), base64: (await build(r, meta)).output("datauristring").split(",")[1]}; }
 
-  window.LeasePdf = { download, prepare };
+  window.LeasePdf = { download, asBase64, prepare };
 })();

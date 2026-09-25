@@ -9,7 +9,8 @@
     cost: null, down: null, months: null,   // down: {type: "pct" | "amt", value}
     pending: null, msgs: [], busy: false,
     ai: CFG.aiUrl ? "unknown" : "off",
-    result: null, explain: null, lead: false
+    result: null, explain: null,
+    lead: null, leadName: "", leadPhone: "", leadErr: null   // lead: null | "form" | "sending" | {name, phone}
   };
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -176,7 +177,7 @@
   function calculate(){
     const d = downAmount();
     S.result = {cost: S.cost, down: d, downPct: d / S.cost * 100, months: S.months, rate: CFG.annualRatePct, ...annuity(S.cost, d, S.months, CFG.annualRatePct)};
-    S.lead = false;
+    if (S.lead !== "sending") { S.lead = null; S.leadErr = null; }
     S.explain = {text: templateExplain(S.result), src: "шаблон"};
     renderResult(); renderCtx(); writeHash();
     // Пояснение от ИИ запрашиваем после паузы, чтобы не дёргать модель при движении ползунка.
@@ -185,7 +186,13 @@
     explainTimer = setTimeout(() => {
       ai("explain", {data: {cost: plain(r.cost), down: plain(r.down), downPct: Math.round(r.downPct * 100) / 100, financed: plain(r.financed),
         months: r.months, rate: r.rate, payment: plain(r.payment), total: plain(r.total), overpayment: plain(r.overpayment)}})
-        .then(x => { if (x && x.text && S.result === r) { S.explain = {text: x.text, src: "ИИ"}; renderResult(); } });
+        .then(x => {
+          if (!(x && x.text && S.result === r)) return;
+          S.explain = {text: x.text, src: "ИИ"};
+          // Обновляем только абзац пояснения, чтобы не сбивать ввод в форме заявки.
+          const t = $("explainText"), src = $("explainSrc");
+          if (t && src) { t.textContent = x.text; src.textContent = "Пояснение: ИИ"; } else renderResult();
+        });
     }, 700);
   }
   function templateExplain(r){
@@ -260,7 +267,7 @@
           <div class="kpi"><div class="lbl">Переплата</div><div class="val">${money(r.overpayment)}</div></div>
           <div class="kpi"><div class="lbl">Сумма финансирования</div><div class="val">${money(r.financed)}</div></div>
         </div>
-        <div class="explain stack" style="gap:4px"><p>${esc(S.explain.text)}</p><span class="muted small">Пояснение: ${esc(S.explain.src)}</span></div>
+        <div class="explain stack" style="gap:4px"><p id="explainText">${esc(S.explain.text)}</p><span class="muted small" id="explainSrc">Пояснение: ${esc(S.explain.src)}</span></div>
         <div class="disclaimer">Предварительный расчёт, не является офертой. Ставка удорожания — ${r.rate}% годовых.</div>
         <div class="row">
           <button type="button" class="primary" id="leadBtn">Оставить заявку менеджеру для точного расчёта</button>
@@ -268,9 +275,7 @@
           <button type="button" id="copyBtn">Скопировать расчёт</button>
           <button type="button" class="ghost" id="linkBtn">Ссылка на расчёт</button>
         </div>
-        ${S.lead ? `<div class="lead-box stack" style="gap:6px"><h3>Заявка сформирована</h3>
-          <p>${esc(describeParams())}; платёж ${money(r.payment)} в месяц.</p>
-          <p class="muted small">Скачайте PDF или скопируйте расчёт и отправьте менеджеру BCC Leasing: он подготовит точный расчёт по вашим условиям.</p></div>` : ""}
+        ${leadMarkup(r)}
       </div>
       <div class="card pad stack">
         <div class="row between"><h2>График платежей</h2><span class="muted small">${monthsStr(r.months)} · суммы в тенге</span></div>
@@ -280,7 +285,8 @@
           <tfoot><tr><td>Итого</td><td>${plain(r.total)}</td><td>${plain(r.financed)}</td><td>${plain(r.overpayment)}</td><td></td></tr></tfoot>
         </table></div>
       </div>`;
-    $("leadBtn").onclick = () => { S.lead = true; renderResult(); };
+    $("leadBtn").onclick = () => { if (!S.lead) { S.lead = "form"; renderResult(); } const f = $("leadName"); if (f) f.focus(); };
+    bindLead(r);
     $("copyBtn").onclick = () => copy(summaryText(), "copyBtn");
     $("pdfBtn").onclick = async () => {
       const b = $("pdfBtn"); b.disabled = true; b.textContent = "Готовлю PDF…";
@@ -290,6 +296,71 @@
     };
     $("linkBtn").onclick = () => copy(location.href, "linkBtn");
   }
+  // ---------- заявка менеджеру ----------
+  const phoneDigits = s => { let d = String(s).replace(/\D/g, ""); if (d.length === 11 && d[0] === "8") d = "7" + d.slice(1); if (d.length === 10) d = "7" + d; return d; };
+  const phonePretty = d => d.length === 11 ? `+${d[0]} ${d.slice(1, 4)} ${d.slice(4, 7)} ${d.slice(7, 9)} ${d.slice(9)}` : d;
+
+  function leadMarkup(r){
+    if (!S.lead) return "";
+    if (typeof S.lead === "object") return `
+      <div class="lead-box stack" style="gap:8px" id="leadDone">
+        <h3>Спасибо, ${esc(S.lead.name)}! Заявка отправлена</h3>
+        <p>Ваш расчёт: ${esc(describeParams())}. Ежемесячный платёж — <b>${money(r.payment)}</b>, переплата — ${money(r.overpayment)}.</p>
+        <p>Заявку получил менеджер BCC Leasing. В ближайшее время он свяжется с вами по номеру <b>${esc(S.lead.phone)}</b>, уточнит условия и подготовит точный расчёт.</p>
+        <div class="row"><button type="button" id="leadPdf">Скачать PDF расчёта</button></div>
+      </div>`;
+    const sending = S.lead === "sending";
+    return `
+      <form class="lead-box stack" id="leadForm" novalidate style="gap:10px">
+        <h3>Заявка менеджеру</h3>
+        <p class="muted small">Менеджер получит расчёт с графиком платежей и свяжется с вами.</p>
+        <div class="pair" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+          <div class="field"><div class="col"><label for="leadName">Имя</label>
+            <input type="text" id="leadName" autocomplete="name" maxlength="80" placeholder="Как к вам обращаться" value="${esc(S.leadName)}"></div></div>
+          <div class="field"><div class="col"><label for="leadPhone">Телефон</label>
+            <input type="tel" id="leadPhone" autocomplete="tel" inputmode="tel" maxlength="20" placeholder="+7 7XX XXX XX XX" value="${esc(S.leadPhone)}"></div></div>
+        </div>
+        ${S.leadErr ? `<div class="err">${esc(S.leadErr)}</div>` : ""}
+        <button type="submit" class="primary" ${sending ? "disabled" : ""}>${sending ? "Отправляю заявку…" : "Отправить заявку"}</button>
+        <p class="muted small">Нажимая «Отправить заявку», вы соглашаетесь, что BCC Leasing свяжется с вами по этой заявке.</p>
+      </form>`;
+  }
+
+  function bindLead(r){
+    const pdfBtn = $("leadPdf");
+    if (pdfBtn) pdfBtn.onclick = () => window.LeasePdf.download(r, {explain: S.explain.text, url: location.href}).catch(() => {});
+    const form = $("leadForm");
+    if (!form) return;
+    $("leadName").oninput = e => { S.leadName = e.target.value; };
+    $("leadPhone").oninput = e => { S.leadPhone = e.target.value; };
+    $("leadPhone").onblur = e => { const d = phoneDigits(e.target.value); if (d.length === 11) { S.leadPhone = e.target.value = phonePretty(d); } };
+    form.onsubmit = async e => {
+      e.preventDefault();
+      const name = S.leadName.trim(), d = phoneDigits(S.leadPhone);
+      S.leadErr = name.length < 2 ? "Укажите имя." : !(d.length === 11 && d[0] === "7") ? "Укажите телефон в формате +7 7XX XXX XX XX." : null;
+      if (S.leadErr) { renderResult(); return; }
+      const phone = phonePretty(d);
+      S.lead = "sending"; renderResult();
+      try {
+        const pdf = await window.LeasePdf.asBase64(r, {explain: S.explain.text, url: location.href, client: {name, phone}});
+        const res = await fetch(CFG.aiUrl, {
+          method: "POST",
+          headers: {"Content-Type": "application/json", apikey: CFG.supabaseKey},
+          body: JSON.stringify({action: "lead", name, phone, url: location.href, filename: pdf.filename, pdfBase64: pdf.base64,
+            summary: {cost: money(r.cost), down: `${money(r.down)} (${pctStr(r.downPct)})`, months: monthsStr(r.months),
+              payment: money(r.payment), overpayment: money(r.overpayment), rate: `${r.rate}% годовых`}})
+        });
+        if (!res.ok) throw new Error("http_" + res.status);
+        S.lead = {name, phone}; S.leadErr = null;
+      } catch {
+        S.lead = "form";
+        S.leadErr = "Не удалось отправить заявку. Проверьте интернет и попробуйте ещё раз или скачайте PDF и отправьте его менеджеру.";
+      }
+      if (S.result === r) renderResult();
+      const done = $("leadDone"); if (done) done.scrollIntoView({behavior: "smooth", block: "center"});
+    };
+  }
+
   function renderAll(){ renderParams(); renderResult(); renderCtx(); }
 
   function summaryText(){
@@ -321,7 +392,7 @@
   }
 
   function reset(){
-    Object.assign(S, {cost: null, down: null, months: null, pending: null, msgs: [], result: null, explain: null, lead: false});
+    Object.assign(S, {cost: null, down: null, months: null, pending: null, msgs: [], result: null, explain: null, lead: null, leadErr: null});
     history.replaceState(null, "", location.pathname);
     greet(); renderAll();
   }
