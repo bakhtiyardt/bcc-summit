@@ -23,8 +23,8 @@
     if (!ready) ready = (async () => {
       await loadScript("vendor/jspdf.umd.min.js");
       await loadScript("vendor/jspdf.plugin.autotable.min.js");
-      const [regular, bold] = await Promise.all([fontBase64("fonts/Inter-Regular.ttf"), fontBase64("fonts/Inter-Bold.ttf")]);
-      return { regular, bold };
+      const [regular, bold, logo] = await Promise.all([fontBase64("fonts/Inter-Regular.ttf"), fontBase64("fonts/Inter-Bold.ttf"), fontBase64("img/logo.png")]);
+      return { regular, bold, logo: "data:image/png;base64," + logo };
     })().catch(e => { ready = null; throw e; });
     return ready;
   }
@@ -43,14 +43,9 @@
     const W = 210, M = 16, CW = W - M * 2;
     const date = new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
 
-    // Шапка: логотип bcc △ leasing
-    doc.setFont("Inter", "bold"); doc.setFontSize(17); doc.setTextColor(...INK);
-    doc.text("bcc", M, 20);
-    const bx = M + doc.getTextWidth("bcc") + 1.6;
-    doc.setDrawColor(...BLUE); doc.setLineWidth(0.9); doc.setLineJoin("round");
-    doc.triangle(bx + 2.6, 14.4, bx + 5.4, 19.6, bx, 19.6, "S");
+    // Шапка: фирменный логотип (966×160 px), высота 7 мм
+    doc.addImage(fonts.logo, "PNG", M, 13.5, 7 * 966 / 160, 7);
     doc.setFont("Inter", "normal"); doc.setTextColor(...MUTED);
-    doc.text("leasing", bx + 7, 20);
     doc.setFontSize(9); doc.text(`Лизинг для бизнеса · ${date}`, W - M, 20, { align: "right" });
     doc.setDrawColor(...LINE); doc.setLineWidth(0.3); doc.line(M, 25, W - M, 25);
 
